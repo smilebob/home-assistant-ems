@@ -1,0 +1,136 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Welcome to Smart Residential EMS",
+        "description": "Choose your initial setup mode for your energy ecosystem (Felicity, Mitsubishi Ecodan, Tesla, Solcast & Machine Learning).",
+        "data": {
+          "setup_mode": "Configuration Mode"
+        }
+      },
+      "menu": {
+        "title": "Configuration by Thematic Tabs",
+        "description": "Select a section to configure, then click Finish.",
+        "menu_options": {
+          "tariff": "1. General & Tariff (Fixed / TOU / Dynamic)",
+          "felicity": "2. Felicity Inverter & 15 kWh Battery (ha_felicity)",
+          "ecodan": "3. Mitsubishi Ecodan Dual-Zone Heat Pump & DHW",
+          "ev": "4. EV Charging (Tesla Fleet & Local Tuya EVSE)",
+          "forecast": "5. Weather, Solcast & ML Learning (2-year history)",
+          "finish": "Finish and start EMS"
+        }
+      },
+      "tariff": {
+        "title": "Tariff & Grid Pricing",
+        "description": "Configure your current tariff (16.89 c€ import / 4 c€ export) and prepare for future TOU or Dynamic pricing.",
+        "data": {
+          "tariff_mode": "Active Tariff Mode",
+          "grid_import_price_fixed": "Fixed Import Price (€/kWh)",
+          "grid_export_price_fixed": "Fixed Export Price (€/kWh)",
+          "grid_import_price_entity": "Live Import Price Sensor (optional, for TOU/Dynamic)",
+          "grid_export_price_entity": "Live Export Price Sensor (optional)",
+          "dynamic_cheap_threshold": "Cheap price threshold for forced grid charging (€/kWh)"
+        }
+      },
+      "felicity": {
+        "title": "Felicity Hybrid Inverter & Battery (ha_felicity)",
+        "description": "Map your ha_felicity Modbus entities and 15 kWh battery thresholds.",
+        "data": {
+          "pv_power_entity": "Solar PV Power Sensor (W)",
+          "grid_power_entity": "Grid Power Sensor (W, positive=import, negative=export)",
+          "house_load_entity": "House Load Power Sensor (W)",
+          "battery_soc_entity": "Battery SOC Sensor (%)",
+          "battery_power_entity": "Battery Power Sensor (W)",
+          "felicity_work_mode_entity": "Felicity Work Mode Select Entity",
+          "felicity_force_charge_entity": "Felicity Force Grid Charge Switch",
+          "battery_capacity_kwh": "Total Battery Capacity (kWh)",
+          "battery_min_soc": "Minimum Reserve SOC (%)",
+          "battery_target_soc_ev": "Minimum Battery SOC before diverting surplus to Tesla (%)"
+        }
+      },
+      "ecodan": {
+        "title": "Mitsubishi Ecodan Heat Pump (esphome-ecodan-hp)",
+        "description": "Configure DHW tank, Zone 1 (Upstairs radiators - Heating curve, Eleonore thermostat) and Zone 2 (Living room floor heating).",
+        "data": {
+          "ecodan_power_entity": "Heat Pump Electrical Power Sensor (W)",
+          "dhw_temp_entity": "DHW Tank Temperature Sensor (°C)",
+          "dhw_target_entity": "DHW Target Temperature Entity (°C)",
+          "dhw_force_entity": "Force DHW Boost Switch / Button",
+          "dhw_normal_temp": "Normal Comfort DHW Setpoint (°C)",
+          "dhw_boost_temp": "Solar Boost DHW Setpoint (°C)",
+          "dhw_solar_window_start": "DHW Solar Window Start Hour (h)",
+          "dhw_solar_window_end": "DHW Solar Window End Hour (h)",
+          "z1_temp_entity": "Zone 1 Temperature Sensor (Eleonore North Bedroom)",
+          "z1_target_entity": "Zone 1 Thermostat / Target Entity",
+          "z1_rooms_entities": "Zone 1 Additional Room Temperature Sensors (Gaston, Parents, Bath)",
+          "z2_temp_entity": "Zone 2 Temperature Sensor (Living Room)",
+          "z2_target_entity": "Zone 2 Thermostat / Target Entity (Floor Heating)",
+          "z2_max_overheat_offset": "Max Living Room Overheat Offset for Thermal Storage (+°C)"
+        }
+      },
+      "ev": {
+        "title": "EV Charging (Tesla Fleet & Local Tuya EVSE)",
+        "description": "Smooth current modulation via Tesla Fleet (prevents Tuya EVSE contactor drops).",
+        "data": {
+          "ev_plugged_entity": "EV Plugged-in Binary Sensor (Tesla)",
+          "ev_soc_entity": "Tesla Battery Level Sensor (%)",
+          "ev_target_soc_entity": "Tesla Target SOC Limit (%)",
+          "tesla_charge_switch": "Tesla Start/Stop Charge Switch",
+          "tesla_current_number": "Tesla Charging Amps Number (A)",
+          "evse_power_switch": "EVSE Power Switch (Local Tuya)",
+          "ev_min_current": "Minimum Starting Current (A)",
+          "ev_max_current": "Maximum Allowed Current (A)",
+          "ev_voltage": "Nominal Grid Voltage (V)",
+          "ev_ramp_seconds": "Smoothing Ramp Delay Between Current Steps (s)"
+        }
+      },
+      "forecast": {
+        "title": "Solcast / Weather Forecast & Machine Learning",
+        "description": "Configure Solcast/Open-Meteo (D+0, D+1, D+2) and local ML training on your 2-year Recorder history.",
+        "data": {
+          "outdoor_temp_entity": "Outdoor Temperature Sensor (°C)",
+          "solar_forecast_today_remaining": "Remaining Solar Forecast Today D+0 (kWh)",
+          "solar_forecast_tomorrow": "Solar Forecast Tomorrow D+1 (kWh)",
+          "solar_forecast_day_after": "Solar Forecast Day After Tomorrow D+2 (kWh)",
+          "ml_training_days": "Recorder History Depth for ML Training (days)",
+          "ml_auto_train": "Automatic Nightly ML Model Retraining"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single instance of Smart Residential EMS is needed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Smart Residential EMS Configuration",
+        "description": "Modify settings by thematic tab or run the full guided wizard.",
+        "menu_options": {
+          "tariff": "1. General & Tariff (Fixed / TOU / Dynamic)",
+          "felicity": "2. Felicity Inverter & 15 kWh Battery (ha_felicity)",
+          "ecodan": "3. Mitsubishi Ecodan Dual-Zone Heat Pump & DHW",
+          "ev": "4. EV Charging (Tesla Fleet & Local Tuya EVSE)",
+          "forecast": "5. Weather, Solcast & ML Learning",
+          "wizard_start": "Run Full Guided Setup Wizard",
+          "save": "Save and apply changes"
+        }
+      }
+    }
+  },
+  "selector": {
+    "setup_mode": {
+      "options": {
+        "wizard": "Step-by-step Guided Wizard (Recommended for initial setup)",
+        "tabs": "Free Menu by Thematic Tabs"
+      }
+    },
+    "tariff_mode": {
+      "options": {
+        "fixed": "Fixed Base Tariff (16.89 c€ import / 4 c€ export)",
+        "time_of_use": "Time of Use (Peak / Off-Peak / Tempo)",
+        "dynamic": "Dynamic Hourly Pricing (Spot / Nordpool / Tibber)"
+      }
+    }
+  }
+}

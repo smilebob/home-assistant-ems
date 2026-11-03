@@ -1,0 +1,207 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bienvenue dans Smart Residential EMS",
+        "description": "Choisissez votre mode de configuration initiale pour votre écosystème (Felicity, Mitsubishi Ecodan, Tesla, Solcast & Machine Learning).",
+        "data": {
+          "setup_mode": "Mode de configuration"
+        }
+      },
+      "menu": {
+        "title": "Configuration par Onglets Thématiques",
+        "description": "Sélectionnez une section à configurer, puis cliquez sur Terminer.",
+        "menu_options": {
+          "tariff": "1. Général & Tarification (Fixe / HP-HC / Dynamique)",
+          "felicity": "2. Onduleur & Batterie 15 kWh (ha_felicity)",
+          "ecodan": "3. PAC Mitsubishi Ecodan Bi-Zone & ECS",
+          "ev": "4. Recharge Véhicule (Tesla Fleet & Borne Tuya)",
+          "forecast": "5. Météo, Solcast & Apprentissage ML (2 ans d'historique)",
+          "finish": "Terminer et lancer l'EMS"
+        }
+      },
+      "tariff": {
+        "title": "Tarification & Évolutivité Réseau",
+        "description": "Configurez votre tarif actuel (16,89 c€ achat / 4 c€ revente) et préparez le passage futur en HP/HC ou Tarif Dynamique.",
+        "data": {
+          "tariff_mode": "Mode tarifaire actif",
+          "grid_import_price_fixed": "Prix d'achat fixe (€/kWh)",
+          "grid_export_price_fixed": "Prix de revente surplus (€/kWh)",
+          "grid_import_price_entity": "Capteur prix d'achat temps réel (optionnel, pour HP/HC ou Dynamique)",
+          "grid_export_price_entity": "Capteur prix de vente temps réel (optionnel)",
+          "dynamic_cheap_threshold": "Seuil de prix bas pour charge réseau forcée (€/kWh)"
+        }
+      },
+      "felicity": {
+        "title": "Onduleur Hybride & Batterie (ha_felicity)",
+        "description": "Associez les entités Modbus de votre intégration ha_felicity et les seuils de la batterie 15 kWh.",
+        "data": {
+          "pv_power_entity": "Capteur Puissance Solaire PV (W)",
+          "grid_power_entity": "Capteur Puissance Réseau (W, positif=achat, négatif=injection)",
+          "house_load_entity": "Capteur Consommation Maison (W)",
+          "battery_soc_entity": "Capteur SOC Batterie (%)",
+          "battery_power_entity": "Capteur Puissance Batterie (W)",
+          "felicity_work_mode_entity": "Sélecteur Mode de travail Felicity (Self-Consumption / Economic)",
+          "felicity_force_charge_entity": "Switch Charge Forcée Réseau Felicity",
+          "battery_capacity_kwh": "Capacité totale de la batterie (kWh)",
+          "battery_min_soc": "SOC Minimum de réserve sécurité (%)",
+          "battery_target_soc_ev": "SOC Batterie minimum avant d'autoriser le surplus vers la Tesla (%)"
+        }
+      },
+      "ecodan": {
+        "title": "PAC Mitsubishi Ecodan (esphome-ecodan-hp)",
+        "description": "Configurez le ballon ECS, la Zone 1 (Chambres à l'étage - loi d'eau, thermostat Éléonore) et la Zone 2 (Salon RDC - plancher chauffant auto-adaptatif).",
+        "data": {
+          "ecodan_power_entity": "Capteur Puissance électrique consommée par la PAC (W)",
+          "dhw_temp_entity": "Capteur Température Ballon ECS (°C)",
+          "dhw_target_entity": "Entité Consigne ECS (°C)",
+          "dhw_force_entity": "Switch / Bouton Forçage Chauffe ECS (DHW Force)",
+          "dhw_normal_temp": "Consigne ECS Confort normale (°C)",
+          "dhw_boost_temp": "Consigne ECS Boost Solaire / Stockage thermique (°C)",
+          "dhw_solar_window_start": "Heure de début de fenêtre solaire ECS (h)",
+          "dhw_solar_window_end": "Heure de fin de fenêtre solaire ECS (h)",
+          "z1_temp_entity": "Capteur Température Zone 1 (Chambre Éléonore Nord)",
+          "z1_target_entity": "Thermostat / Consigne Zone 1 (Chambres)",
+          "z1_rooms_entities": "Capteurs Thermomètres annexes Zone 1 (Gaston, Parents, SdB)",
+          "z2_temp_entity": "Capteur Température Zone 2 (Salon RDC)",
+          "z2_target_entity": "Thermostat / Consigne Zone 2 (Plancher chauffant Salon)",
+          "z2_max_overheat_offset": "Surchauffe max autorisée Salon pour stockage d'inertie solaire (+°C)"
+        }
+      },
+      "ev": {
+        "title": "Mobilité Électrique (Tesla Fleet & Borne IRVE Tuya)",
+        "description": "Pilotage doux de l'ampérage via Tesla Fleet (évite de faire planter la borne Tuya lors des baisses de courant).",
+        "data": {
+          "ev_plugged_entity": "Capteur Câble branché (Tesla)",
+          "ev_soc_entity": "Capteur Niveau de batterie Tesla (%)",
+          "ev_target_soc_entity": "Limite de charge cible Tesla (%)",
+          "tesla_charge_switch": "Switch Démarrer/Arrêter la charge (Tesla Fleet)",
+          "tesla_current_number": "Réglage Courant de charge (A) (Tesla Fleet)",
+          "evse_power_switch": "Switch Alimentation Borne IRVE (Local Tuya)",
+          "ev_min_current": "Courant minimum de démarrage (A)",
+          "ev_max_current": "Courant maximum autorisé (A)",
+          "ev_voltage": "Tension nominale du réseau (V)",
+          "ev_ramp_seconds": "Temporisation de lissage entre deux paliers d'ampérage (s)"
+        }
+      },
+      "forecast": {
+        "title": "Prévisions Solcast / Météo & Machine Learning",
+        "description": "Configurez Solcast/Open-Meteo (J+0, J+1, J+2) et l'apprentissage automatique sur vos 2 ans d'historique Home Assistant.",
+        "data": {
+          "outdoor_temp_entity": "Capteur Température Extérieure (°C)",
+          "solar_forecast_today_remaining": "Prévision Solaire Restante Aujourd'hui J+0 (kWh)",
+          "solar_forecast_tomorrow": "Prévision Solaire Demain J+1 (kWh)",
+          "solar_forecast_day_after": "Prévision Solaire Après-Demain J+2 (kWh)",
+          "ml_training_days": "Profondeur d'historique Recorder pour l'entraînement ML (jours)",
+          "ml_auto_train": "Ré-entraînement nocturne automatique du modèle ML"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Une seule instance de Smart Residential EMS est nécessaire."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configuration Smart Residential EMS",
+        "description": "Modifiez vos paramètres par onglet thématique ou relancez l'assistant complet.",
+        "menu_options": {
+          "tariff": "1. Général & Tarification (Fixe / HP-HC / Dynamique)",
+          "felicity": "2. Onduleur & Batterie 15 kWh (ha_felicity)",
+          "ecodan": "3. PAC Mitsubishi Ecodan Bi-Zone & ECS",
+          "ev": "4. Recharge Véhicule (Tesla Fleet & Borne Tuya)",
+          "forecast": "5. Météo, Solcast & Apprentissage ML",
+          "wizard_start": "Relancer l'Assistant pas-à-pas complet (Wizard)",
+          "save": "Enregistrer et appliquer les modifications"
+        }
+      },
+      "tariff": {
+        "title": "Tarification & Évolutivité Réseau",
+        "data": {
+          "tariff_mode": "Mode tarifaire actif",
+          "grid_import_price_fixed": "Prix d'achat fixe (€/kWh)",
+          "grid_export_price_fixed": "Prix de revente surplus (€/kWh)",
+          "grid_import_price_entity": "Capteur prix d'achat temps réel (optionnel)",
+          "grid_export_price_entity": "Capteur prix de vente temps réel (optionnel)",
+          "dynamic_cheap_threshold": "Seuil de prix bas pour charge réseau forcée (€/kWh)"
+        }
+      },
+      "felicity": {
+        "title": "Onduleur Hybride & Batterie (ha_felicity)",
+        "data": {
+          "pv_power_entity": "Capteur Puissance Solaire PV (W)",
+          "grid_power_entity": "Capteur Puissance Réseau (W)",
+          "house_load_entity": "Capteur Consommation Maison (W)",
+          "battery_soc_entity": "Capteur SOC Batterie (%)",
+          "battery_power_entity": "Capteur Puissance Batterie (W)",
+          "felicity_work_mode_entity": "Sélecteur Mode de travail Felicity",
+          "felicity_force_charge_entity": "Switch Charge Forcée Réseau Felicity",
+          "battery_capacity_kwh": "Capacité totale de la batterie (kWh)",
+          "battery_min_soc": "SOC Minimum de réserve sécurité (%)",
+          "battery_target_soc_ev": "SOC Batterie minimum avant d'autoriser la Tesla (%)"
+        }
+      },
+      "ecodan": {
+        "title": "PAC Mitsubishi Ecodan (esphome-ecodan-hp)",
+        "data": {
+          "ecodan_power_entity": "Capteur Puissance électrique PAC (W)",
+          "dhw_temp_entity": "Capteur Température Ballon ECS (°C)",
+          "dhw_target_entity": "Entité Consigne ECS (°C)",
+          "dhw_force_entity": "Switch / Bouton Forçage Chauffe ECS",
+          "dhw_normal_temp": "Consigne ECS Confort normale (°C)",
+          "dhw_boost_temp": "Consigne ECS Boost Solaire (°C)",
+          "dhw_solar_window_start": "Heure début fenêtre solaire ECS (h)",
+          "dhw_solar_window_end": "Heure fin fenêtre solaire ECS (h)",
+          "z1_temp_entity": "Capteur Température Zone 1 (Chambre Éléonore)",
+          "z1_target_entity": "Thermostat / Consigne Zone 1",
+          "z1_rooms_entities": "Capteurs Thermomètres annexes Zone 1 (Gaston, Parents, SdB)",
+          "z2_temp_entity": "Capteur Température Zone 2 (Salon RDC)",
+          "z2_target_entity": "Thermostat / Consigne Zone 2 (Plancher chauffant)",
+          "z2_max_overheat_offset": "Surchauffe max autorisée Salon (+°C)"
+        }
+      },
+      "ev": {
+        "title": "Mobilité Électrique (Tesla Fleet & Borne IRVE)",
+        "data": {
+          "ev_plugged_entity": "Capteur Câble branché (Tesla)",
+          "ev_soc_entity": "Capteur Niveau de batterie Tesla (%)",
+          "ev_target_soc_entity": "Limite de charge cible Tesla (%)",
+          "tesla_charge_switch": "Switch Démarrer/Arrêter la charge (Tesla Fleet)",
+          "tesla_current_number": "Réglage Courant de charge (A) (Tesla Fleet)",
+          "evse_power_switch": "Switch Alimentation Borne IRVE (Local Tuya)",
+          "ev_min_current": "Courant minimum de démarrage (A)",
+          "ev_max_current": "Courant maximum autorisé (A)",
+          "ev_voltage": "Tension nominale du réseau (V)",
+          "ev_ramp_seconds": "Temporisation entre deux paliers d'ampérage (s)"
+        }
+      },
+      "forecast": {
+        "title": "Prévisions Solcast / Météo & Machine Learning",
+        "data": {
+          "outdoor_temp_entity": "Capteur Température Extérieure (°C)",
+          "solar_forecast_today_remaining": "Prévision Solaire Restante Aujourd'hui J+0 (kWh)",
+          "solar_forecast_tomorrow": "Prévision Solaire Demain J+1 (kWh)",
+          "solar_forecast_day_after": "Prévision Solaire Après-Demain J+2 (kWh)",
+          "ml_training_days": "Profondeur d'historique Recorder pour l'entraînement ML (jours)",
+          "ml_auto_train": "Ré-entraînement nocturne automatique du modèle ML"
+        }
+      }
+    }
+  },
+  "selector": {
+    "setup_mode": {
+      "options": {
+        "wizard": "Assistant pas-à-pas guidé (Recommandé pour la première configuration)",
+        "tabs": "Menu libre par onglets thématiques"
+      }
+    },
+    "tariff_mode": {
+      "options": {
+        "fixed": "Tarif de Base Fixe (16,89 c€ achat / 4 c€ revente)",
+        "time_of_use": "Heures Pleines / Heures Creuses (HP/HC ou Tempo)",
+        "dynamic": "Tarification Dynamique Horaire (Spot / Nordpool / Tibber)"
+      }
+    }
+  }
+}

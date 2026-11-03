@@ -1,0 +1,3 @@
+retrain_ml_model:
+  name: Ré-entraîner le modèle Machine Learning (2 ans d'historique)
+  description: Extrait les 2 dernières années d'historique du Recorder Home Assistant (PAC Ecodan, consommation maison, températures intérieures/extérieures) et ré-entraîne le modèle RandomForestRegressor local.
