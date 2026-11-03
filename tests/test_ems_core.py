@@ -30,10 +30,11 @@ from custom_components.ems.const import (
     PRIORITY_4_THERMAL_BOOST,
 )
 from custom_components.ems.core.arbitrator import EnergyArbitrator
+from custom_components.ems.core.controllers.ecodan import EcodanController
 from custom_components.ems.core.controllers.tesla import TeslaController
 from custom_components.ems.core.tariff import TariffManager
-from custom_components.ems.ml.dataset_builder import build_feature_vector
-from custom_components.ems.ml.model import ConsumptionMLModel
+from custom_components.ems.ml.dataset_builder import build_feature_vector, build_solar_feature_vector
+from custom_components.ems.ml.model import ConsumptionMLModel, SolarCalibrationModel
 
 
 class TestSmartResidentialEMS(unittest.TestCase):
@@ -150,34 +151,27 @@ class TestSmartResidentialEMS(unittest.TestCase):
         ctrl = TeslaController(config)
         t0 = datetime(2026, 5, 10, 12, 0, 0)
 
-        # 1. Start charging -> should call select_option "Start charging" and set both vehicle & EVSE numbers
+        # 1. Start charging -> should set vehicle current first (sequence_order 1), then EVSE after vehicle ack
         charging, amps, cmds = ctrl.compute_charging_step(
             now=t0,
             ev_plugged=True,
             ev_soc=45.0,
             ev_target_soc=80.0,
             available_power_for_ev_watts=2300.0,
+            reported_vehicle_amps=6.0,
         )
         self.assertTrue(charging)
         self.assertEqual(amps, 6)
-        # Verify select_option was issued for Tuya EVSE select
-        self.assertTrue(any(
-            c["entity_id"] == "select.garage_borne_voiture_toggle_charging"
-            and c["domain"] == "select"
-            and c["service"] == "select_option"
-            and c["data"]["option"] == "Start charging"
-            for c in cmds
-        ))
-        # Verify EVSE current setpoint
-        self.assertTrue(any(
-            c["entity_id"] == "number.garage_borne_voiture_set_charge_current"
-            and c["domain"] == "number"
-            and c["data"]["value"] == 6.0
-            for c in cmds
-        ))
-        # Verify Tesla switch & number
+        # Verify strict sequence_order: vehicle number (1) < EVSE number (3) < EVSE start (4)
+        veh_cmd = next(c for c in cmds if c["entity_id"] == "number.sally_courant_de_recharge")
+        evse_num_cmd = next(c for c in cmds if c["entity_id"] == "number.garage_borne_voiture_set_charge_current")
+        evse_start_cmd = next(c for c in cmds if c["entity_id"] == "select.garage_borne_voiture_toggle_charging")
+        self.assertLess(veh_cmd["sequence_order"], evse_num_cmd["sequence_order"])
+        self.assertEqual(evse_num_cmd["wait_for_entity"], "number.sally_courant_de_recharge")
+        self.assertEqual(evse_num_cmd["wait_for_value"], 6)
+        self.assertEqual(evse_start_cmd["data"]["option"], "Start charging")
+        self.assertEqual(evse_num_cmd["data"]["value"], 6.0)
         self.assertTrue(any(c["entity_id"] == "switch.sally_charge" and c["service"] == "turn_on" for c in cmds))
-        self.assertTrue(any(c["entity_id"] == "number.sally_courant_de_recharge" and c["data"]["value"] == 6 for c in cmds))
 
         # 2. Stop charging -> should send "Stop charging" to Tuya EVSE select and turn_off to vehicle
         ctrl.charge_started_at = t0 - timedelta(minutes=5)  # past anti-short-cycle
@@ -349,6 +343,68 @@ class TestSmartResidentialEMS(unittest.TestCase):
         self.assertEqual(res4["active_priority"], PRIORITY_4_THERMAL_BOOST)
         self.assertEqual(res4["dhw_target"], 55.0)
         self.assertEqual(res4["z2_target"], 21.5)
+        self.assertIn("Priorité 4", res4["decision_reason"])
+
+    def test_solar_calibration_model_and_valves(self) -> None:
+        """Verify intermediate SolarCalibrationModel learns shading/derating vs Solcast and Ecodan evaluates valves."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cal_path = os.path.join(tmpdir, "solar_cal.pkl")
+            cal = SolarCalibrationModel(storage_path=cal_path)
+
+            X_rows: list[list[float]] = []
+            y_rows: list[float] = []
+            hour_pairs: list[tuple[int, float, float]] = []
+            base_dt = datetime(2025, 6, 1, 0, 0)
+            for d in range(30):
+                for h in range(7, 20):
+                    dt = base_dt + timedelta(days=d, hours=h)
+                    solcast_w = 4000.0 if 11 <= h <= 15 else 1500.0
+                    # Simulate morning tree shading at 8h-9h (50% actual) and 90% midday efficiency
+                    true_ratio = 0.50 if h in (8, 9) else 0.90
+                    actual_w = solcast_w * true_ratio
+                    X_rows.append(build_solar_feature_vector(dt, solcast_watts=solcast_w, outdoor_temp=22.0))
+                    y_rows.append(actual_w)
+                    hour_pairs.append((h, solcast_w, actual_w))
+
+            metrics = cal.train(X_rows, y_rows, hour_pairs)
+            self.assertTrue(cal.is_trained)
+            self.assertGreater(metrics["solar_samples"], 100)
+
+            # Morning shaded hour should be calibrated down significantly compared to raw Solcast
+            cal_morning_w = cal.calibrate_power_watts(
+                datetime(2026, 6, 10, 8, 30), solcast_watts=1500.0, outdoor_temp=20.0
+            )
+            self.assertLess(cal_morning_w, 1100.0)
+            self.assertLess(cal.hourly_ratios[8], 0.75)
+
+            # Daily kWh forecasts should also be calibrated
+            rem_kwh, tom_kwh, day3_kwh = cal.calibrate_daily_forecasts(
+                now=datetime(2026, 6, 10, 8, 0),
+                raw_today_rem_kwh=20.0,
+                raw_tomorrow_kwh=25.0,
+                raw_day_after_kwh=25.0,
+            )
+            self.assertLess(tom_kwh, 25.0)
+            self.assertGreater(tom_kwh, 15.0)
+
+        # Verify thermostatic valve balancing recommendations
+        ecodan = EcodanController({})
+        summary, valves = ecodan.evaluate_valve_recommendations(
+            z1_ref_temp=19.5,
+            z1_target_temp=19.5,
+            room_readings=[
+                {"entity_id": "sensor.chambre_gaston", "name": "Chambre Gaston", "temp": 21.0},
+                {"entity_id": "sensor.chambre_parents", "name": "Chambre Parents", "temp": 18.2},
+                {"entity_id": "sensor.sdb", "name": "Salle de Bain", "temp": 19.6},
+            ],
+        )
+        self.assertIn("2 vanne(s)", summary)
+        self.assertEqual(len(valves), 3)
+        self.assertEqual(valves[0]["direction"], "close")
+        self.assertIn("Fermer", valves[0]["action"])
+        self.assertEqual(valves[1]["direction"], "open")
+        self.assertIn("Ouvrir", valves[1]["action"])
+        self.assertEqual(valves[2]["direction"], "ok")
 
 
 if __name__ == "__main__":

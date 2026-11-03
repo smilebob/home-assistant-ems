@@ -16,9 +16,11 @@ from .const import (
     VERSION,
     CONF_BATTERY_MIN_SOC,
     CONF_BATTERY_TARGET_SOC_EV,
+    CONF_BATTERY_THERMAL_SOC_THRESHOLD,
     CONF_Z2_MAX_OVERHEAT_OFFSET,
     DEFAULT_BATTERY_MIN_SOC,
     DEFAULT_BATTERY_TARGET_SOC_EV,
+    DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD,
     DEFAULT_Z2_MAX_OFFSET,
 )
 from .coordinator import EMSDataUpdateCoordinator
@@ -54,6 +56,17 @@ async def async_setup_entry(
             unit=PERCENTAGE,
             default_val=DEFAULT_BATTERY_TARGET_SOC_EV,
             icon="mdi:battery-arrow-up",
+        ),
+        EMSConfigNumber(
+            coordinator,
+            conf_key=CONF_BATTERY_THERMAL_SOC_THRESHOLD,
+            name="EMS Battery SOC Threshold Before Thermal Storage",
+            min_val=75.0,
+            max_val=100.0,
+            step=1.0,
+            unit=PERCENTAGE,
+            default_val=DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD,
+            icon="mdi:battery-heart-variant",
         ),
         EMSConfigNumber(
             coordinator,

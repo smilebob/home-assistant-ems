@@ -1,4 +1,4 @@
-"""Central Energy Arbitrator implementing the 4-priority cascade and cloud smoothing."""
+"""Central Energy Arbitrator implementing the 4-priority cascade, explainability, and cloud smoothing."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import logging
 from typing import Any
 
 from ..const import (
+    CONF_BATTERY_THERMAL_SOC_THRESHOLD,
+    DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD,
     PRIORITY_IDLE,
     PRIORITY_1_COMFORT_DHW,
     PRIORITY_2_BATTERY,
@@ -36,6 +38,8 @@ class EnergyArbitrator:
 
         # Rolling window of net surplus power (W) for cloud smoothing (last 5 readings = ~2.5 min)
         self._surplus_window: deque[float] = deque(maxlen=5)
+        self._decision_log: deque[dict[str, str]] = deque(maxlen=10)
+        self._last_logged_priority: str | None = None
 
         # Runtime user overrides (switches)
         self.auto_mode_enabled: bool = True
@@ -74,14 +78,18 @@ class EnergyArbitrator:
         predicted_overnight_kwh: float,
         live_states: dict[str, Any],
         ev_measured_power_w: float = 0.0,
+        reported_vehicle_amps: float | None = None,
+        z1_target: float | None = None,
+        z1_rooms_readings: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Run one full arbitration cycle and return state metrics + hardware commands."""
         # 1. Calculate raw and smoothed solar surplus
-        # Net surplus available before battery charging and before EV charging
         if ev_measured_power_w > 50.0:
             ev_current_power_w = ev_measured_power_w
         else:
-            ev_current_power_w = self.tesla.current_amps * self.tesla.voltage if self.tesla.is_charging else 0.0
+            ev_current_power_w = (
+                self.tesla.current_amps * self.tesla.voltage if self.tesla.is_charging else 0.0
+            )
         base_house_without_ev_w = max(0.0, house_load_w - ev_current_power_w)
         raw_surplus_w = pv_power_w - base_house_without_ev_w
         self._surplus_window.append(raw_surplus_w)
@@ -92,11 +100,16 @@ class EnergyArbitrator:
         cheap_grid_active = self.tariff.is_cheap_grid_opportunity(live_states)
         spread_eur = self.tariff.calculate_self_consumption_spread(live_states)
 
-        # 3. Compute dynamic battery target SOC based on Solcast & ML load prediction
+        # 3. Compute dynamic battery target SOC based on calibrated Solcast & ML load prediction
         dynamic_batt_target_soc = self.felicity.calculate_dynamic_target_soc(
             predicted_overnight_load_kwh=predicted_overnight_kwh,
             solar_forecast_today_remaining_kwh=solar_today_remaining_kwh,
             solar_forecast_tomorrow_kwh=solar_tomorrow_kwh,
+        )
+        thermal_soc_threshold = float(
+            self.config.get(
+                CONF_BATTERY_THERMAL_SOC_THRESHOLD, DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD
+            )
         )
 
         all_commands: list[dict[str, Any]] = []
@@ -104,24 +117,36 @@ class EnergyArbitrator:
 
         # Determine Priority Hierarchy:
         # Priority 1: Comfort Heating & Scheduled Solar DHW
-        # Priority 2: Home Battery (15 kWh) up to dynamic_batt_target_soc
-        # Priority 3: Tesla Solar Charging (modulated 5A-16A via Tesla Fleet)
-        # Priority 4: Thermal inertia storage (Zone 2 underfloor + DHW 55°C boost)
+        # Priority 2: Home Battery (15 kWh) up to dynamic_batt_target_soc (and up to thermal_soc_threshold before P4)
+        # Priority 3: Tesla Solar Charging (modulated via Tesla Fleet -> Borne Tuya)
+        # Priority 4: Thermal inertia storage (only when battery_soc >= thermal_soc_threshold)
+        dhw_normal_cfg = float(self.config.get("dhw_normal_temp", 48.0))
         if cheap_grid_active:
             active_priority = PRIORITY_DYNAMIC_GRID_CHARGE
         elif smoothed_surplus_w > 300.0:
-            if dhw_temp is not None and dhw_temp < float(self.config.get("dhw_normal_temp", 48.0)) - 3.0 and self.ecodan.is_in_dhw_solar_window(now):
+            if (
+                dhw_temp is not None
+                and dhw_temp < dhw_normal_cfg - 3.0
+                and self.ecodan.is_in_dhw_solar_window(now)
+            ):
                 active_priority = PRIORITY_1_COMFORT_DHW
             elif battery_soc < dynamic_batt_target_soc:
                 active_priority = PRIORITY_2_BATTERY
-            elif ev_plugged and ev_soc < ev_target_soc and smoothed_surplus_w >= self.tesla.min_start_power_watts:
+            elif (
+                ev_plugged
+                and ev_soc < ev_target_soc
+                and smoothed_surplus_w >= self.tesla.min_start_power_watts
+            ):
                 active_priority = PRIORITY_3_TESLA
+            elif battery_soc < thermal_soc_threshold:
+                # Continue charging battery until it reaches the thermal storage SOC threshold (e.g. 95%)
+                active_priority = PRIORITY_2_BATTERY
             else:
                 active_priority = PRIORITY_4_THERMAL_BOOST
 
         # Execute controller evaluations if Auto Mode is active
         dhw_heating = False
-        dhw_target = float(self.config.get("dhw_normal_temp", 48.0))
+        dhw_target = dhw_normal_cfg
         new_z2_target = z2_target
         ev_charging = self.tesla.is_charging
         ev_amps = self.tesla.current_amps
@@ -153,18 +178,14 @@ class EnergyArbitrator:
             )
             all_commands.extend(z2_cmds)
 
-            # C. Tesla Fleet Current Modulation
-            # Available power for EV depends on whether battery has reached its dynamic target SOC
+            # C. Tesla Fleet + Tuya EVSE Strict Sequenced Current Modulation
             if self.force_tesla_charge or cheap_grid_active:
                 avail_ev_watts = self.tesla.max_amps * self.tesla.voltage
             elif battery_soc >= dynamic_batt_target_soc:
-                # Battery is satisfied -> allocate all net solar surplus to Tesla
                 avail_ev_watts = max(0.0, smoothed_surplus_w)
             elif battery_soc >= dynamic_batt_target_soc - 10.0 and smoothed_surplus_w > 2500.0:
-                # High surplus while battery is nearly at target -> share 60% with Tesla
                 avail_ev_watts = smoothed_surplus_w * 0.6
             else:
-                # Priority 2 (Battery) keeps the solar power
                 avail_ev_watts = 0.0
 
             ev_charging, ev_amps, ev_cmds = self.tesla.compute_charging_step(
@@ -174,8 +195,44 @@ class EnergyArbitrator:
                 ev_target_soc=ev_target_soc,
                 available_power_for_ev_watts=avail_ev_watts,
                 force_max_charge=self.force_tesla_charge or cheap_grid_active,
+                reported_vehicle_amps=reported_vehicle_amps,
             )
             all_commands.extend(ev_cmds)
+
+        # 4. Evaluate Thermostatic Valve Balancing Advice for Zone 1 Rooms
+        valve_summary, valve_details = self.ecodan.evaluate_valve_recommendations(
+            z1_ref_temp=z1_temp,
+            z1_target_temp=z1_target,
+            room_readings=z1_rooms_readings or [],
+        )
+
+        # 5. Build clear French Decision Explainability string
+        decision_reason = self._build_decision_explanation(
+            active_priority=active_priority,
+            smoothed_surplus_w=smoothed_surplus_w,
+            battery_soc=battery_soc,
+            dynamic_batt_target_soc=dynamic_batt_target_soc,
+            thermal_soc_threshold=thermal_soc_threshold,
+            dhw_temp=dhw_temp,
+            dhw_target=dhw_target,
+            ev_plugged=ev_plugged,
+            ev_soc=ev_soc,
+            ev_target_soc=ev_target_soc,
+            ev_charging=ev_charging,
+            ev_amps=ev_amps,
+            new_z2_target=new_z2_target,
+            import_price=import_price,
+        )
+
+        if active_priority != self._last_logged_priority:
+            self._decision_log.appendleft(
+                {
+                    "time": now.strftime("%H:%M:%S"),
+                    "priority": active_priority,
+                    "reason": decision_reason,
+                }
+            )
+            self._last_logged_priority = active_priority
 
         # Estimate instant hourly savings rate (€/h) from self-consumed PV
         self_consumed_watts = min(pv_power_w, max(0.0, house_load_w + max(0.0, battery_power_w)))
@@ -184,6 +241,8 @@ class EnergyArbitrator:
         return {
             "timestamp": now.isoformat(),
             "active_priority": active_priority,
+            "decision_reason": decision_reason,
+            "decision_log": list(self._decision_log),
             "auto_mode": self.auto_mode_enabled,
             "pv_power_w": round(pv_power_w, 1),
             "grid_power_w": round(grid_power_w, 1),
@@ -193,17 +252,21 @@ class EnergyArbitrator:
             "battery_soc": round(battery_soc, 1),
             "battery_power_w": round(battery_power_w, 1),
             "dynamic_battery_target_soc": dynamic_batt_target_soc,
+            "battery_thermal_soc_threshold": thermal_soc_threshold,
             "dhw_temp": dhw_temp,
             "dhw_target": dhw_target,
             "dhw_heating_recommended": dhw_heating,
             "z1_temp": z1_temp,
             "z2_temp": z2_temp,
             "z2_target": new_z2_target,
+            "valve_summary": valve_summary,
+            "valve_recommendations": valve_details,
             "ev_plugged": ev_plugged,
             "ev_soc": ev_soc,
             "ev_target_soc": ev_target_soc,
             "ev_charging": ev_charging,
             "ev_target_amps": ev_amps,
+            "ev_sequencing_status": self.tesla.sequencing_status,
             "outdoor_temp": outdoor_temp,
             "solar_today_remaining_kwh": solar_today_remaining_kwh,
             "solar_tomorrow_kwh": solar_tomorrow_kwh,
@@ -217,3 +280,69 @@ class EnergyArbitrator:
             "cheap_grid_opportunity": cheap_grid_active,
             "commands": all_commands,
         }
+
+    def _build_decision_explanation(
+        self,
+        active_priority: str,
+        smoothed_surplus_w: float,
+        battery_soc: float,
+        dynamic_batt_target_soc: float,
+        thermal_soc_threshold: float,
+        dhw_temp: float | None,
+        dhw_target: float,
+        ev_plugged: bool,
+        ev_soc: float,
+        ev_target_soc: float,
+        ev_charging: bool,
+        ev_amps: int,
+        new_z2_target: float | None,
+        import_price: float,
+    ) -> str:
+        """Return a human-readable French explanation of the current arbitrage decision."""
+        if not self.auto_mode_enabled:
+            return "Pilote automatique désactivé par l'utilisateur (mode manuel)."
+
+        surplus_int = int(round(smoothed_surplus_w))
+        batt_int = int(round(battery_soc))
+
+        if active_priority == PRIORITY_DYNAMIC_GRID_CHARGE:
+            return (
+                f"Tarif réseau très bas ({import_price:.3f} €/kWh) : "
+                f"charge forcée batterie ({batt_int}%), VE et ballon ECS."
+            )
+        if active_priority == PRIORITY_1_COMFORT_DHW:
+            return (
+                f"Priorité 1 (ECS Solaire) : Surplus de {surplus_int} W utilisé pour chauffer "
+                f"l'ECS ({dhw_temp}°C -> cible {dhw_target}°C) dans le créneau solaire optimal."
+            )
+        if active_priority == PRIORITY_2_BATTERY:
+            if battery_soc < dynamic_batt_target_soc:
+                return (
+                    f"Priorité 2 (Batterie Felicity) : Surplus de {surplus_int} W réservé à la "
+                    f"batterie ({batt_int}% < cible autonomie nuit {int(dynamic_batt_target_soc)}%)."
+                )
+            return (
+                f"Priorité 2 (Complément Batterie) : VE non demandeur ; le surplus ({surplus_int} W) "
+                f"charge la batterie ({batt_int}%) jusqu'au seuil d'inertie thermique ({int(thermal_soc_threshold)}%)."
+            )
+        if active_priority == PRIORITY_3_TESLA:
+            return (
+                f"Priorité 3 (Charge VE) : Batterie à {batt_int}% (>= cible {int(dynamic_batt_target_soc)}%). "
+                f"Surplus de {surplus_int} W modulé vers VE à {ev_amps} A ({self.tesla.sequencing_status})."
+            )
+        if active_priority == PRIORITY_4_THERMAL_BOOST:
+            return (
+                f"Priorité 4 (Inertie Thermique) : Batterie pleine ({batt_int}% >= {int(thermal_soc_threshold)}%). "
+                f"Surplus ({surplus_int} W) stocké dans le plancher Zone 2 (cible {new_z2_target}°C) et l'ECS ({dhw_target}°C)."
+            )
+
+        # IDLE explanation
+        if smoothed_surplus_w <= 0:
+            return (
+                f"Autoconsommation standard : déficit solaire ({surplus_int} W), "
+                f"la batterie ({batt_int}%) couvre les besoins de la maison."
+            )
+        return (
+            f"Veille active : faible surplus lissé ({surplus_int} W < 300 W), "
+            f"absorbé par la batterie ({batt_int}%)."
+        )

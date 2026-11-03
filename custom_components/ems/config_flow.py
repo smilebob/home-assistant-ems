@@ -33,6 +33,7 @@ from .const import (
     CONF_FELICITY_FORCE_CHARGE_ENTITY,
     CONF_BATTERY_MIN_SOC,
     CONF_BATTERY_TARGET_SOC_EV,
+    CONF_BATTERY_THERMAL_SOC_THRESHOLD,
     CONF_ECODAN_POWER_ENTITY,
     CONF_DHW_TEMP_ENTITY,
     CONF_DHW_TARGET_ENTITY,
@@ -60,6 +61,7 @@ from .const import (
     CONF_EV_VOLTAGE,
     CONF_EV_RAMP_SECONDS,
     CONF_OUTDOOR_TEMP_ENTITY,
+    CONF_SOLAR_FORECAST_POWER_NOW,
     CONF_SOLAR_FORECAST_TODAY_REMAINING,
     CONF_SOLAR_FORECAST_TOMORROW,
     CONF_SOLAR_FORECAST_DAY_AFTER,
@@ -71,6 +73,7 @@ from .const import (
     DEFAULT_BATTERY_CAPACITY_KWH,
     DEFAULT_BATTERY_MIN_SOC,
     DEFAULT_BATTERY_TARGET_SOC_EV,
+    DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD,
     DEFAULT_DHW_NORMAL_TEMP,
     DEFAULT_DHW_BOOST_TEMP,
     DEFAULT_DHW_WINDOW_START,
@@ -179,6 +182,17 @@ def get_felicity_schema(defaults: dict[str, Any]) -> vol.Schema:
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=20, max=100, step=5, unit_of_measurement="%")
             ),
+            vol.Required(
+                CONF_BATTERY_THERMAL_SOC_THRESHOLD,
+                default=int(
+                    defaults.get(
+                        CONF_BATTERY_THERMAL_SOC_THRESHOLD,
+                        DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD,
+                    )
+                ),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=75, max=100, step=1, unit_of_measurement="%")
+            ),
         }
     )
 
@@ -286,6 +300,9 @@ def get_forecast_schema(defaults: dict[str, Any]) -> vol.Schema:
             _opt_marker(CONF_OUTDOOR_TEMP_ENTITY, defaults): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=["sensor", "weather"])
             ),
+            _opt_marker(CONF_SOLAR_FORECAST_POWER_NOW, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
             _opt_marker(CONF_SOLAR_FORECAST_TODAY_REMAINING, defaults): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor")
             ),
@@ -318,13 +335,39 @@ class EMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._data: dict[str, Any] = {}
         self._setup_mode: str = SETUP_MODE_WIZARD
+        self._reconfigure_entry: config_entries.ConfigEntry | None = None
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle reconfiguration of an existing EMS entry."""
+        entry_id = self.context.get("entry_id")
+        if entry_id:
+            self._reconfigure_entry = self.hass.config_entries.async_get_entry(entry_id)
+        if not self._reconfigure_entry:
+            entries = self._async_current_entries()
+            if entries:
+                self._reconfigure_entry = entries[0]
+
+        if self._reconfigure_entry and not self._data:
+            data = self._reconfigure_entry.data or {}
+            options = self._reconfigure_entry.options or {}
+            self._data = {**data, **options}
+
+        self._setup_mode = SETUP_MODE_TABS
+        return await self.async_step_menu()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Initial step: choose between Guided Wizard or Thematic Tabs."""
-        if self._async_current_entries():
-            return self.async_abort(reason="single_instance_allowed")
+        entries = self._async_current_entries()
+        if entries:
+            self._reconfigure_entry = entries[0]
+            if not self._data:
+                data = self._reconfigure_entry.data or {}
+                options = self._reconfigure_entry.options or {}
+                self._data = {**data, **options}
 
         if user_input is not None:
             self._setup_mode = user_input.get("setup_mode", SETUP_MODE_WIZARD)
@@ -434,7 +477,16 @@ class EMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_finish(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Finalize setup and create config entry."""
+        """Finalize setup and create or update config entry."""
+        if self._reconfigure_entry is not None:
+            self.hass.config_entries.async_update_entry(
+                self._reconfigure_entry,
+                data=self._data,
+                options=self._data,
+            )
+            await self.hass.config_entries.async_reload(self._reconfigure_entry.entry_id)
+            return self.async_abort(reason="reconfigure_successful")
+
         return self.async_create_entry(
             title="Smart Residential EMS",
             data=self._data,

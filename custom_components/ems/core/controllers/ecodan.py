@@ -183,3 +183,68 @@ class EcodanController:
                 )
 
         return new_target, commands
+
+    def evaluate_valve_recommendations(
+        self,
+        z1_ref_temp: float | None,
+        z1_target_temp: float | None,
+        room_readings: list[dict[str, Any]],
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Compute thermostatic radiator valve balancing advice for Zone 1 rooms.
+
+        Compares each room against the Zone 1 comfort target (or reference room temperature
+        when Zone 1 is driven by water departure temperature / loi d'eau).
+        """
+        if z1_target_temp is not None and 15.0 <= z1_target_temp <= 24.5:
+            ref_temp = round(z1_target_temp, 1)
+        elif z1_ref_temp is not None and 15.0 <= z1_ref_temp <= 24.5:
+            ref_temp = round(z1_ref_temp, 1)
+        else:
+            ref_temp = 20.0
+
+        recommendations: list[dict[str, Any]] = []
+        adjust_count = 0
+
+        for item in room_readings:
+            name = item.get("name", item.get("entity_id", "Pièce"))
+            temp = item.get("temp")
+            if temp is None:
+                continue
+            delta = round(float(temp) - ref_temp, 1)
+            if delta > 1.2:
+                action = "Fermer (-1/2 tour / -1 cran)"
+                direction = "close"
+                adjust_count += 1
+            elif delta > 0.5:
+                action = "Fermer légèrement (-1/4 tour)"
+                direction = "close_slight"
+                adjust_count += 1
+            elif delta < -1.2:
+                action = "Ouvrir (+1/2 tour / +1 cran)"
+                direction = "open"
+                adjust_count += 1
+            elif delta < -0.5:
+                action = "Ouvrir légèrement (+1/4 tour)"
+                direction = "open_slight"
+                adjust_count += 1
+            else:
+                action = "Équilibrée (ne pas toucher)"
+                direction = "ok"
+
+            recommendations.append(
+                {
+                    "room": name,
+                    "entity_id": item.get("entity_id"),
+                    "temp": round(float(temp), 1),
+                    "reference_temp": ref_temp,
+                    "delta": delta,
+                    "action": action,
+                    "direction": direction,
+                }
+            )
+
+        if not recommendations:
+            return "Aucun capteur de pièce configuré", []
+        if adjust_count == 0:
+            return f"Toutes les vannes sont équilibrées (réf. {ref_temp}°C)", recommendations
+        return f"{adjust_count} vanne(s) à ajuster (réf. {ref_temp}°C)", recommendations

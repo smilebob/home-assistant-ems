@@ -45,6 +45,7 @@ CONF_FELICITY_WORK_MODE_ENTITY: Final = "felicity_work_mode_entity"
 CONF_FELICITY_FORCE_CHARGE_ENTITY: Final = "felicity_force_charge_entity"
 CONF_BATTERY_MIN_SOC: Final = "battery_min_soc"
 CONF_BATTERY_TARGET_SOC_EV: Final = "battery_target_soc_ev"
+CONF_BATTERY_THERMAL_SOC_THRESHOLD: Final = "battery_thermal_soc_threshold"
 
 # Mitsubishi Ecodan Config Keys (esphome-ecodan-hp)
 CONF_ECODAN_POWER_ENTITY: Final = "ecodan_power_entity"
@@ -80,6 +81,7 @@ CONF_EV_RAMP_SECONDS: Final = "ev_ramp_seconds"
 
 # Weather, Solcast & ML Config Keys
 CONF_OUTDOOR_TEMP_ENTITY: Final = "outdoor_temp_entity"
+CONF_SOLAR_FORECAST_POWER_NOW: Final = "solar_forecast_power_now"
 CONF_SOLAR_FORECAST_TODAY_REMAINING: Final = "solar_forecast_today_remaining"
 CONF_SOLAR_FORECAST_TOMORROW: Final = "solar_forecast_tomorrow"
 CONF_SOLAR_FORECAST_DAY_AFTER: Final = "solar_forecast_day_after"
@@ -93,6 +95,7 @@ DEFAULT_DYNAMIC_CHEAP_THRESHOLD: Final = 0.0800
 DEFAULT_BATTERY_CAPACITY_KWH: Final = 15.0
 DEFAULT_BATTERY_MIN_SOC: Final = 15
 DEFAULT_BATTERY_TARGET_SOC_EV: Final = 80
+DEFAULT_BATTERY_THERMAL_SOC_THRESHOLD: Final = 95
 DEFAULT_DHW_NORMAL_TEMP: Final = 48.0
 DEFAULT_DHW_BOOST_TEMP: Final = 55.0
 DEFAULT_DHW_WINDOW_START: Final = 11

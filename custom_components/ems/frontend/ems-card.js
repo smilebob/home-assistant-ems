@@ -1,7 +1,10 @@
 /**
- * Smart Residential EMS - Custom Lovelace Card (ems-card.js)
+ * Smart Residential EMS - Custom Lovelace Card (ems-card.js) v1.1.0
  * Displays live PV/Battery/Grid/Ecodan/Tesla energy flows, 4-Priority state,
- * Solcast (D+0/D+1/D+2) vs ML 24h Load forecast, and one-click override switches.
+ * Explainable EMS Decision Banner, Strict EV Sequencing Status,
+ * Solcast Brut vs EMS Auto-Calibrated ML Forecasts (D+0/D+1/D+2 + Instant W),
+ * Consumption ML Accuracy (%, MAE W, R²), Thermostatic Valve Balancing Advice,
+ * and one-click override switches.
  */
 
 class SmartResidentialEMSCard extends HTMLElement {
@@ -47,6 +50,17 @@ class SmartResidentialEMSCard extends HTMLElement {
     return labels[state] || state || "Initialisation...";
   }
 
+  _formatSeqLabel(status) {
+    const map = {
+      synchronized: "Synchronisé (Véhicule ✓ → Borne ✓)",
+      vehicle_confirmed_borne_synced: "Confirmé Véhicule ✓ → Borne appliquée ✓",
+      vehicle_timeout_fallback: "Timeout confirmation véhicule (15s) → Borne pilotée",
+      awaiting_vehicle_confirmation: "Attente confirmation consigne véhicule...",
+      idle: "Repos",
+    };
+    return map[status] || status || "Prêt";
+  }
+
   _render() {
     if (!this._hass || !this.shadowRoot) return;
 
@@ -54,12 +68,14 @@ class SmartResidentialEMSCard extends HTMLElement {
     const attrs = mainState ? mainState.attributes : {};
     const priorityState = mainState ? mainState.state : "idle";
 
+    const decisionReason = attrs.decision_reason || "Analyse des flux énergétiques en cours...";
     const pvW = attrs.pv_power_w ?? 0;
     const gridW = attrs.grid_power_w ?? 0;
     const loadW = attrs.house_load_w ?? 0;
     const surplusW = attrs.smoothed_surplus_w ?? 0;
     const battSoc = attrs.battery_soc ?? 0;
     const battTargetSoc = attrs.dynamic_battery_target_soc ?? 80;
+    const battThermalSoc = attrs.battery_thermal_soc_threshold ?? 95;
     const dhwTemp = attrs.dhw_temp ?? "--";
     const dhwTarget = attrs.dhw_target ?? 48;
     const z1Temp = attrs.z1_temp ?? "--";
@@ -69,15 +85,53 @@ class SmartResidentialEMSCard extends HTMLElement {
     const evSoc = attrs.ev_soc ?? "--";
     const evCharging = attrs.ev_charging ?? false;
     const evAmps = attrs.ev_target_amps ?? 0;
-    const solToday = attrs.solar_today_remaining_kwh ?? 0;
-    const solTomorrow = attrs.solar_tomorrow_kwh ?? 0;
-    const solDayAfter = attrs.solar_day_after_kwh ?? 0;
+    const evSeqStatus = attrs.ev_sequencing_status || "idle";
+
+    // Raw vs Calibrated Solar
+    const rawSolPowerW = attrs.raw_solar_forecast_power_w ?? 0;
+    const calSolPowerW = attrs.calibrated_solar_power_w ?? 0;
+    const solRatioPct = attrs.solar_calibration_ratio ? Math.round(attrs.solar_calibration_ratio * 100) : 100;
+    const rawSolToday = attrs.raw_solar_today_remaining_kwh ?? attrs.solar_today_remaining_kwh ?? 0;
+    const calSolToday = attrs.calibrated_solar_today_remaining_kwh ?? attrs.solar_today_remaining_kwh ?? 0;
+    const rawSolTomorrow = attrs.raw_solar_tomorrow_kwh ?? attrs.solar_tomorrow_kwh ?? 0;
+    const calSolTomorrow = attrs.calibrated_solar_tomorrow_kwh ?? attrs.solar_tomorrow_kwh ?? 0;
+    const calSolDayAfter = attrs.calibrated_solar_day_after_kwh ?? attrs.solar_day_after_kwh ?? 0;
+
+    // ML Metrics
     const pred24h = attrs.predicted_24h_kwh ?? 0;
+    const mlMae = attrs.ml_mae_watts ?? "--";
+    const mlAcc = attrs.ml_accuracy_pct ?? "--";
+    const mlR2 = attrs.ml_r2_score ?? "--";
+
+    // Tariff
     const importPrice = attrs.import_price_eur ?? 0.1689;
     const exportPrice = attrs.export_price_eur ?? 0.04;
-    const mlMae = attrs.ml_mae_watts ?? "--";
+
+    // Thermostatic Valves
+    const valves = Array.isArray(attrs.valve_recommendations) ? attrs.valve_recommendations : [];
+    const valveSummary = attrs.valve_summary || "Aucun capteur de pièce annexe configuré";
 
     const isSwitchOn = (ent) => this._hass.states[ent]?.state === "on";
+
+    const valvesHtml = valves.length > 0
+      ? `<div class="valve-list">
+          ${valves.map((v) => {
+            const dir = v.direction || v.status || "ok";
+            const cls = (dir.startsWith("close") || dir === "too_hot") ? "hot" : (dir.startsWith("open") || dir === "too_cold") ? "cold" : "ok";
+            const deltaVal = v.delta ?? v.delta_c ?? 0;
+            const tempVal = v.temp ?? v.temp_c ?? "--";
+            const refVal = v.reference_temp ?? v.target_c ?? "--";
+            const sign = deltaVal > 0 ? `+${deltaVal}` : `${deltaVal}`;
+            return `<div class="valve-row">
+              <div>
+                <span class="valve-room">${v.room}</span>
+                <span class="valve-temp">${tempVal} °C (réf. ${refVal} °C, écart ${sign} °C)</span>
+              </div>
+              <span class="valve-badge ${cls}">${v.action}</span>
+            </div>`;
+          }).join("")}
+        </div>`
+      : `<div class="metric-sub" style="padding: 6px 0;">${valveSummary}</div>`;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -95,7 +149,9 @@ class SmartResidentialEMSCard extends HTMLElement {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 14px;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 12px;
         }
         .title {
           font-size: 1.25rem;
@@ -110,9 +166,26 @@ class SmartResidentialEMSCard extends HTMLElement {
           color: #10b981;
           border: 1px solid rgba(16, 185, 129, 0.4);
         }
+        .decision-banner {
+          background: rgba(59, 130, 246, 0.12);
+          border-left: 4px solid #3b82f6;
+          border-radius: 8px;
+          padding: 10px 12px;
+          margin-bottom: 14px;
+          font-size: 0.82rem;
+          line-height: 1.4;
+        }
+        .decision-banner strong {
+          color: #60a5fa;
+          display: block;
+          margin-bottom: 2px;
+          font-size: 0.76rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
         .grid-4 {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
           gap: 10px;
           margin-bottom: 14px;
         }
@@ -128,21 +201,63 @@ class SmartResidentialEMSCard extends HTMLElement {
           margin-bottom: 4px;
         }
         .metric-val {
-          font-size: 1.2rem;
+          font-size: 1.18rem;
           font-weight: 700;
         }
         .metric-sub {
           font-size: 0.72rem;
-          opacity: 0.65;
+          opacity: 0.68;
           margin-top: 3px;
         }
         .section-title {
-          font-size: 0.85rem;
+          font-size: 0.82rem;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.05em;
           opacity: 0.75;
           margin: 14px 0 8px 0;
+        }
+        .valve-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .valve-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.07);
+          border-radius: 10px;
+          padding: 8px 12px;
+          font-size: 0.8rem;
+        }
+        .valve-room {
+          font-weight: 600;
+          margin-right: 8px;
+        }
+        .valve-temp {
+          opacity: 0.7;
+          font-size: 0.75rem;
+        }
+        .valve-badge {
+          padding: 3px 9px;
+          border-radius: 12px;
+          font-size: 0.74rem;
+          font-weight: 600;
+        }
+        .valve-badge.ok {
+          background: rgba(16, 185, 129, 0.16);
+          color: #34d399;
+        }
+        .valve-badge.hot {
+          background: rgba(245, 158, 11, 0.18);
+          color: #fbbf24;
+        }
+        .valve-badge.cold {
+          background: rgba(59, 130, 246, 0.18);
+          color: #60a5fa;
         }
         .controls {
           display: flex;
@@ -176,6 +291,11 @@ class SmartResidentialEMSCard extends HTMLElement {
           <div class="badge">${this._formatPriorityLabel(priorityState)}</div>
         </div>
 
+        <div class="decision-banner">
+          <strong>Décision & Explication EMS en Temps Réel</strong>
+          ${decisionReason}
+        </div>
+
         <div class="section-title">Flux Énergétiques & Stockage Felicity (7 kWc / 15 kWh)</div>
         <div class="grid-4">
           <div class="metric-box">
@@ -186,7 +306,7 @@ class SmartResidentialEMSCard extends HTMLElement {
           <div class="metric-box">
             <div class="metric-label">Batterie Felicity 15 kWh</div>
             <div class="metric-val">${battSoc} %</div>
-            <div class="metric-sub">Seuil dynamique EV : ${battTargetSoc} %</div>
+            <div class="metric-sub">Seuil EV : ${battTargetSoc}% | Inertie : ${battThermalSoc}%</div>
           </div>
           <div class="metric-box">
             <div class="metric-label">Consommation Maison</div>
@@ -200,7 +320,7 @@ class SmartResidentialEMSCard extends HTMLElement {
           </div>
         </div>
 
-        <div class="section-title">PAC Mitsubishi Ecodan Bi-Zone & Mobilité Tesla Fleet</div>
+        <div class="section-title">PAC Mitsubishi Ecodan Bi-Zone & Mobilité Tesla Fleet + Borne Tuya</div>
         <div class="grid-4">
           <div class="metric-box">
             <div class="metric-label">Eau Chaude Sanitaire (ECS)</div>
@@ -218,30 +338,38 @@ class SmartResidentialEMSCard extends HTMLElement {
             <div class="metric-sub">Cible : ${z2Target} °C (Inertie)</div>
           </div>
           <div class="metric-box">
-            <div class="metric-label">Tesla Fleet (${evPlugged ? "Branchée" : "Débranchée"})</div>
-            <div class="metric-val">${evSoc} %</div>
-            <div class="metric-sub">${evCharging ? `En charge à ${evAmps} A` : "Charge en pause"}</div>
+            <div class="metric-label">Sally & Borne (${evPlugged ? "Branchée" : "Débranchée"})</div>
+            <div class="metric-val">${evSoc} % ${evCharging ? `⚡ ${evAmps}A` : ""}</div>
+            <div class="metric-sub">${this._formatSeqLabel(evSeqStatus)}</div>
           </div>
         </div>
 
-        <div class="section-title">Prévisions Solcast (J+0/J+1/J+2) & Machine Learning (2 ans Recorder)</div>
+        <div class="section-title">Étage d'Auto-Correction Solaire ML (Solcast Brut vs Calibré Installation) & Conso</div>
         <div class="grid-4">
           <div class="metric-box">
-            <div class="metric-label">Solcast Restant J+0</div>
-            <div class="metric-val">${solToday} kWh</div>
-            <div class="metric-sub">Demain J+1 : ${solTomorrow} kWh</div>
+            <div class="metric-label">Puissance Solaire Prédite</div>
+            <div class="metric-val">${calSolPowerW} W</div>
+            <div class="metric-sub">Solcast brut : ${rawSolPowerW} W (Ratio ${solRatioPct}%)</div>
           </div>
           <div class="metric-box">
-            <div class="metric-label">Solcast Après-Demain J+2</div>
-            <div class="metric-val">${solDayAfter} kWh</div>
-            <div class="metric-sub">Horizon 48h</div>
+            <div class="metric-label">Reste Aujourd'hui J+0 Calibré</div>
+            <div class="metric-val">${calSolToday} kWh</div>
+            <div class="metric-sub">Solcast brut : ${rawSolToday} kWh</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Demain J+1 Calibré</div>
+            <div class="metric-val">${calSolTomorrow} kWh</div>
+            <div class="metric-sub">Brut : ${rawSolTomorrow} kWh | J+2 : ${calSolDayAfter} kWh</div>
           </div>
           <div class="metric-box">
             <div class="metric-label">Conso Prédite ML (24h)</div>
             <div class="metric-val">${pred24h} kWh</div>
-            <div class="metric-sub">Précision MAE : ±${mlMae} W</div>
+            <div class="metric-sub">Fiabilité : ${mlAcc}% (±${mlMae} W, R²=${mlR2})</div>
           </div>
         </div>
+
+        <div class="section-title">Conseiller d'Équilibrage des Vannes Thermostatiques (Chambres Zone 1)</div>
+        ${valvesHtml}
 
         <div class="section-title">Pilotage & Forçages Rapides</div>
         <div class="controls">
@@ -258,7 +386,7 @@ class SmartResidentialEMSCard extends HTMLElement {
             Stockage Inertie Salon
           </button>
           <button class="ctrl-btn" id="btn-ml">
-            Ré-entraîner ML (2 ans)
+            Ré-entraîner Modèles ML
           </button>
         </div>
       </ha-card>
@@ -272,7 +400,7 @@ class SmartResidentialEMSCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 6;
+    return 8;
   }
 }
 
@@ -284,5 +412,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "smart-residential-ems-card",
   name: "Smart Residential EMS Card",
-  description: "Supervision temps réel Felicity 15kWh, PAC Ecodan Bi-Zone, Tesla Fleet, Solcast & ML",
+  description: "Supervision temps réel Felicity 15kWh, PAC Ecodan Bi-Zone, Tesla Fleet, Calibration Solcast & ML",
 });

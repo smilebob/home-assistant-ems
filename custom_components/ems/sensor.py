@@ -33,7 +33,19 @@ async def async_setup_entry(
             coordinator,
             key="active_priority",
             name="EMS Active Priority State",
-            icon="mdi:Dynamic-feed",
+            icon="mdi:state-machine",
+        ),
+        EMSSensor(
+            coordinator,
+            key="decision_reason",
+            name="EMS Decision Explanation",
+            icon="mdi:comment-check-outline",
+        ),
+        EMSSensor(
+            coordinator,
+            key="valve_summary",
+            name="EMS Thermostatic Valve Advice",
+            icon="mdi:valve",
         ),
         EMSSensor(
             coordinator,
@@ -61,6 +73,57 @@ async def async_setup_entry(
             device_class=SensorDeviceClass.ENERGY,
             state_class=SensorStateClass.MEASUREMENT,
             icon="mdi:weather-night",
+        ),
+        EMSSensor(
+            coordinator,
+            key="ml_mae_watts",
+            name="EMS ML Load Forecast Error (MAE)",
+            unit=UnitOfPower.WATT,
+            device_class=SensorDeviceClass.POWER,
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:chart-bell-curve-cumulative",
+        ),
+        EMSSensor(
+            coordinator,
+            key="ml_accuracy_pct",
+            name="EMS ML Load Forecast Accuracy",
+            unit=PERCENTAGE,
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:bullseye-arrow",
+        ),
+        EMSSensor(
+            coordinator,
+            key="calibrated_solar_today_remaining_kwh",
+            name="EMS Calibrated Solar Forecast Today Remaining",
+            unit=UnitOfEnergy.KILO_WATT_HOUR,
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:solar-power",
+        ),
+        EMSSensor(
+            coordinator,
+            key="calibrated_solar_tomorrow_kwh",
+            name="EMS Calibrated Solar Forecast Tomorrow",
+            unit=UnitOfEnergy.KILO_WATT_HOUR,
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:weather-sunny-alert",
+        ),
+        EMSSensor(
+            coordinator,
+            key="calibrated_solar_power_w",
+            name="EMS Calibrated Solar Power Forecast",
+            unit=UnitOfPower.WATT,
+            device_class=SensorDeviceClass.POWER,
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:white-balance-sunny",
+        ),
+        EMSSensor(
+            coordinator,
+            key="solar_calibration_ratio",
+            name="EMS Solcast Auto-Correction Ratio",
+            state_class=SensorStateClass.MEASUREMENT,
+            icon="mdi:scale-balance",
         ),
         EMSSensor(
             coordinator,
@@ -140,35 +203,78 @@ class EMSSensor(CoordinatorEntity[EMSDataUpdateCoordinator], SensorEntity):
         """Return the state of the sensor."""
         if not self.coordinator.data:
             return None
-        return self.coordinator.data.get(self._key)
+        val = self.coordinator.data.get(self._key)
+        if isinstance(val, str) and len(val) > 250:
+            return val[:247] + "..."
+        return val
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Expose complete EMS dashboard telemetry on the active_priority sensor."""
-        if self._key == "active_priority" and self.coordinator.data:
+        """Expose complete EMS dashboard telemetry on the active_priority and specialized sensors."""
+        if not self.coordinator.data:
+            return {}
+        d = self.coordinator.data
+
+        if self._key == "decision_reason":
             return {
-                "pv_power_w": self.coordinator.data.get("pv_power_w"),
-                "grid_power_w": self.coordinator.data.get("grid_power_w"),
-                "house_load_w": self.coordinator.data.get("house_load_w"),
-                "smoothed_surplus_w": self.coordinator.data.get("smoothed_surplus_w"),
-                "battery_soc": self.coordinator.data.get("battery_soc"),
-                "dynamic_battery_target_soc": self.coordinator.data.get("dynamic_battery_target_soc"),
-                "dhw_temp": self.coordinator.data.get("dhw_temp"),
-                "dhw_target": self.coordinator.data.get("dhw_target"),
-                "z1_temp": self.coordinator.data.get("z1_temp"),
-                "z2_temp": self.coordinator.data.get("z2_temp"),
-                "z2_target": self.coordinator.data.get("z2_target"),
-                "ev_plugged": self.coordinator.data.get("ev_plugged"),
-                "ev_soc": self.coordinator.data.get("ev_soc"),
-                "ev_charging": self.coordinator.data.get("ev_charging"),
-                "ev_target_amps": self.coordinator.data.get("ev_target_amps"),
-                "solar_today_remaining_kwh": self.coordinator.data.get("solar_today_remaining_kwh"),
-                "solar_tomorrow_kwh": self.coordinator.data.get("solar_tomorrow_kwh"),
-                "solar_day_after_kwh": self.coordinator.data.get("solar_day_after_kwh"),
-                "predicted_24h_kwh": self.coordinator.data.get("predicted_24h_kwh"),
-                "import_price_eur": self.coordinator.data.get("import_price_eur"),
-                "export_price_eur": self.coordinator.data.get("export_price_eur"),
-                "ml_mae_watts": self.coordinator.data.get("ml_mae_watts"),
-                "hourly_forecast": self.coordinator.data.get("hourly_forecast"),
+                "active_priority": d.get("active_priority"),
+                "ev_sequencing_status": d.get("ev_sequencing_status"),
+                "decision_log": d.get("decision_log"),
+            }
+
+        if self._key == "valve_summary":
+            return {
+                "recommendations": d.get("valve_recommendations"),
+            }
+
+        if self._key == "solar_calibration_ratio":
+            return {
+                "solar_calibration_samples": d.get("solar_calibration_samples"),
+                "raw_solcast_power_w": d.get("raw_solcast_power_w"),
+                "calibrated_solar_power_w": d.get("calibrated_solar_power_w"),
+                "raw_solar_today_remaining_kwh": d.get("raw_solar_today_remaining_kwh"),
+                "calibrated_solar_today_remaining_kwh": d.get("calibrated_solar_today_remaining_kwh"),
+                "hourly_ratios": d.get("solar_hourly_ratios"),
+            }
+
+        if self._key == "active_priority":
+            return {
+                "decision_reason": d.get("decision_reason"),
+                "decision_log": d.get("decision_log"),
+                "pv_power_w": d.get("pv_power_w"),
+                "grid_power_w": d.get("grid_power_w"),
+                "house_load_w": d.get("house_load_w"),
+                "smoothed_surplus_w": d.get("smoothed_surplus_w"),
+                "battery_soc": d.get("battery_soc"),
+                "dynamic_battery_target_soc": d.get("dynamic_battery_target_soc"),
+                "battery_thermal_soc_threshold": d.get("battery_thermal_soc_threshold"),
+                "dhw_temp": d.get("dhw_temp"),
+                "dhw_target": d.get("dhw_target"),
+                "z1_temp": d.get("z1_temp"),
+                "z2_temp": d.get("z2_temp"),
+                "z2_target": d.get("z2_target"),
+                "valve_summary": d.get("valve_summary"),
+                "valve_recommendations": d.get("valve_recommendations"),
+                "ev_plugged": d.get("ev_plugged"),
+                "ev_soc": d.get("ev_soc"),
+                "ev_charging": d.get("ev_charging"),
+                "ev_target_amps": d.get("ev_target_amps"),
+                "ev_sequencing_status": d.get("ev_sequencing_status"),
+                "raw_solar_today_remaining_kwh": d.get("raw_solar_today_remaining_kwh"),
+                "raw_solar_tomorrow_kwh": d.get("raw_solar_tomorrow_kwh"),
+                "raw_solcast_power_w": d.get("raw_solcast_power_w"),
+                "calibrated_solar_power_w": d.get("calibrated_solar_power_w"),
+                "solar_today_remaining_kwh": d.get("solar_today_remaining_kwh"),
+                "solar_tomorrow_kwh": d.get("solar_tomorrow_kwh"),
+                "solar_day_after_kwh": d.get("solar_day_after_kwh"),
+                "solar_calibration_ratio": d.get("solar_calibration_ratio"),
+                "solar_calibration_samples": d.get("solar_calibration_samples"),
+                "predicted_24h_kwh": d.get("predicted_24h_kwh"),
+                "import_price_eur": d.get("import_price_eur"),
+                "export_price_eur": d.get("export_price_eur"),
+                "ml_mae_watts": d.get("ml_mae_watts"),
+                "ml_accuracy_pct": d.get("ml_accuracy_pct"),
+                "ml_r2_score": d.get("ml_r2_score"),
+                "hourly_forecast": d.get("hourly_forecast"),
             }
         return {}

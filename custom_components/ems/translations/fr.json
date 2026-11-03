@@ -45,7 +45,8 @@
           "felicity_force_charge_entity": "Switch Charge Forcée Réseau Felicity",
           "battery_capacity_kwh": "Capacité totale de la batterie (kWh)",
           "battery_min_soc": "SOC Minimum de réserve sécurité (%)",
-          "battery_target_soc_ev": "SOC Batterie minimum avant d'autoriser le surplus vers la Tesla (%)"
+          "battery_target_soc_ev": "SOC Batterie minimum avant d'autoriser le surplus vers la Tesla (%)",
+          "battery_thermal_soc_threshold": "Seuil SOC Batterie Pleine avant d'activer le stockage par inertie thermique (%)"
         }
       },
       "ecodan": {
@@ -91,6 +92,7 @@
         "description": "Configurez Solcast/Open-Meteo (J+0, J+1, J+2) et l'apprentissage automatique sur vos 2 ans d'historique Home Assistant.",
         "data": {
           "outdoor_temp_entity": "Capteur Température Extérieure (°C)",
+          "solar_forecast_power_now": "Prévision Puissance Solaire Instantanée Solcast (W ou Wh, pour auto-calibration ML)",
           "solar_forecast_today_remaining": "Prévision Solaire Restante Aujourd'hui J+0 (kWh)",
           "solar_forecast_tomorrow": "Prévision Solaire Demain J+1 (kWh)",
           "solar_forecast_day_after": "Prévision Solaire Après-Demain J+2 (kWh)",
@@ -100,7 +102,8 @@
       }
     },
     "abort": {
-      "single_instance_allowed": "Une seule instance de Smart Residential EMS est nécessaire."
+      "single_instance_allowed": "Une seule instance de Smart Residential EMS est nécessaire.",
+      "reconfigure_successful": "La reconfiguration de Smart Residential EMS a été enregistrée et appliquée avec succès."
     }
   },
   "options": {
@@ -141,7 +144,8 @@
           "felicity_force_charge_entity": "Switch Charge Forcée Réseau Felicity",
           "battery_capacity_kwh": "Capacité totale de la batterie (kWh)",
           "battery_min_soc": "SOC Minimum de réserve sécurité (%)",
-          "battery_target_soc_ev": "SOC Batterie minimum avant d'autoriser la Tesla (%)"
+          "battery_target_soc_ev": "SOC Batterie minimum avant d'autoriser la Tesla (%)",
+          "battery_thermal_soc_threshold": "Seuil SOC Batterie Pleine avant stockage par inertie thermique (%)"
         }
       },
       "ecodan": {
@@ -184,6 +188,7 @@
         "title": "Prévisions Solcast / Météo & Machine Learning",
         "data": {
           "outdoor_temp_entity": "Capteur Température Extérieure (°C)",
+          "solar_forecast_power_now": "Prévision Puissance Solaire Instantanée Solcast (W ou Wh, pour auto-calibration ML)",
           "solar_forecast_today_remaining": "Prévision Solaire Restante Aujourd'hui J+0 (kWh)",
           "solar_forecast_tomorrow": "Prévision Solaire Demain J+1 (kWh)",
           "solar_forecast_day_after": "Prévision Solaire Après-Demain J+2 (kWh)",

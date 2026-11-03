@@ -45,7 +45,8 @@
           "felicity_force_charge_entity": "Felicity Force Grid Charge Switch",
           "battery_capacity_kwh": "Total Battery Capacity (kWh)",
           "battery_min_soc": "Minimum Reserve SOC (%)",
-          "battery_target_soc_ev": "Minimum Battery SOC before diverting surplus to Tesla (%)"
+          "battery_target_soc_ev": "Minimum Battery SOC before diverting surplus to Tesla (%)",
+          "battery_thermal_soc_threshold": "Full Battery SOC Threshold before activating Thermal Inertia Storage (%)"
         }
       },
       "ecodan": {
@@ -91,6 +92,7 @@
         "description": "Configure Solcast/Open-Meteo (D+0, D+1, D+2) and local ML training on your 2-year Recorder history.",
         "data": {
           "outdoor_temp_entity": "Outdoor Temperature Sensor (°C)",
+          "solar_forecast_power_now": "Solcast Instant Solar Forecast Power Sensor (W or Wh, for ML auto-calibration)",
           "solar_forecast_today_remaining": "Remaining Solar Forecast Today D+0 (kWh)",
           "solar_forecast_tomorrow": "Solar Forecast Tomorrow D+1 (kWh)",
           "solar_forecast_day_after": "Solar Forecast Day After Tomorrow D+2 (kWh)",
@@ -100,7 +102,8 @@
       }
     },
     "abort": {
-      "single_instance_allowed": "Only a single instance of Smart Residential EMS is needed."
+      "single_instance_allowed": "Only a single instance of Smart Residential EMS is needed.",
+      "reconfigure_successful": "Smart Residential EMS reconfiguration saved and applied."
     }
   },
   "options": {
