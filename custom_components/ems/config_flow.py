@@ -99,11 +99,8 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_TARIFF_MODE, TARIFF_MODE_FIXED),
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=[
-                        selector.SelectOptionDict(value=TARIFF_MODE_FIXED, label="Tarif de Base Fixe"),
-                        selector.SelectOptionDict(value=TARIFF_MODE_TOU, label="Heures Pleines / Heures Creuses (HP/HC)"),
-                        selector.SelectOptionDict(value=TARIFF_MODE_DYNAMIC, label="Tarif Dynamique Horaire (Spot / Nordpool)"),
-                    ],
+                    options=[TARIFF_MODE_FIXED, TARIFF_MODE_TOU, TARIFF_MODE_DYNAMIC],
+                    translation_key="tariff_mode",
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
@@ -112,7 +109,7 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=float(defaults.get(CONF_GRID_IMPORT_PRICE_FIXED, DEFAULT_IMPORT_PRICE)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0.0, max=2.0, step=0.0001, unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
+                    min=0.0, max=2.0, step=0.001, unit_of_measurement="cEUR/kWh"
                 )
             ),
             vol.Required(
@@ -120,7 +117,7 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=float(defaults.get(CONF_GRID_EXPORT_PRICE_FIXED, DEFAULT_EXPORT_PRICE)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0.0, max=2.0, step=0.0001, unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
+                    min=0.0, max=2.0, step=0.001, unit_of_measurement="cEUR/kWh"
                 )
             ),
             _opt_marker(CONF_GRID_IMPORT_PRICE_ENTITY, defaults): selector.EntitySelector(
@@ -134,7 +131,7 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=float(defaults.get(CONF_DYNAMIC_CHEAP_THRESHOLD, DEFAULT_DYNAMIC_CHEAP_THRESHOLD)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=-1.0, max=1.0, step=0.005, unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
+                    min=-1.0, max=1.0, step=0.005, unit_of_measurement="cEUR/kWh"
                 )
             ),
         }
@@ -365,16 +362,8 @@ class EMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("setup_mode", default=SETUP_MODE_WIZARD): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[
-                                selector.SelectOptionDict(
-                                    value=SETUP_MODE_WIZARD,
-                                    label="Assistant pas-à-pas guidé (Recommandé)",
-                                ),
-                                selector.SelectOptionDict(
-                                    value=SETUP_MODE_TABS,
-                                    label="Menu libre par onglets thématiques",
-                                ),
-                            ],
+                            options=[SETUP_MODE_WIZARD, SETUP_MODE_TABS],
+                            translation_key="setup_mode",
                             mode=selector.SelectSelectorMode.LIST,
                         )
                     )
