@@ -210,7 +210,10 @@ class EnergyArbitrator:
         decision_reason = self._build_decision_explanation(
             active_priority=active_priority,
             smoothed_surplus_w=smoothed_surplus_w,
+            grid_power_w=grid_power_w,
+            house_load_w=house_load_w,
             battery_soc=battery_soc,
+            battery_power_w=battery_power_w,
             dynamic_batt_target_soc=dynamic_batt_target_soc,
             thermal_soc_threshold=thermal_soc_threshold,
             dhw_temp=dhw_temp,
@@ -285,7 +288,10 @@ class EnergyArbitrator:
         self,
         active_priority: str,
         smoothed_surplus_w: float,
+        grid_power_w: float,
+        house_load_w: float,
         battery_soc: float,
+        battery_power_w: float,
         dynamic_batt_target_soc: float,
         thermal_soc_threshold: float,
         dhw_temp: float | None,
@@ -304,6 +310,8 @@ class EnergyArbitrator:
 
         surplus_int = int(round(smoothed_surplus_w))
         batt_int = int(round(battery_soc))
+        grid_int = int(round(grid_power_w))
+        load_int = int(round(house_load_w))
 
         if active_priority == PRIORITY_DYNAMIC_GRID_CHARGE:
             return (
@@ -336,11 +344,21 @@ class EnergyArbitrator:
                 f"Surplus ({surplus_int} W) stocké dans le plancher Zone 2 (cible {new_z2_target}°C) et l'ECS ({dhw_target}°C)."
             )
 
-        # IDLE explanation
+        # IDLE explanation based on actual grid vs battery flow
         if smoothed_surplus_w <= 0:
+            if grid_power_w > 150.0:
+                if abs(battery_power_w) < 150.0 or battery_soc <= self.felicity.min_soc + 5.0:
+                    return (
+                        f"Veille (Pas de production solaire) : batterie en réserve ({batt_int}%), "
+                        f"le réseau alimente la maison ({grid_int} W)."
+                    )
+                return (
+                    f"Autoconsommation partielle : déficit solaire ({surplus_int} W), "
+                    f"la batterie ({batt_int}%) et le réseau ({grid_int} W) alimentent la maison ({load_int} W)."
+                )
             return (
-                f"Autoconsommation standard : déficit solaire ({surplus_int} W), "
-                f"la batterie ({batt_int}%) couvre les besoins de la maison."
+                f"Autoconsommation sur batterie : déficit solaire ({surplus_int} W), "
+                f"la batterie ({batt_int}%) couvre les besoins de la maison ({load_int} W)."
             )
         return (
             f"Veille active : faible surplus lissé ({surplus_int} W < 300 W), "
