@@ -82,6 +82,14 @@ from .const import (
 )
 
 
+def _opt_marker(key: str, defaults: dict[str, Any]) -> vol.Optional:
+    """Safely create a vol.Optional with suggested_value only if non-None."""
+    val = defaults.get(key)
+    if val is not None and val != "":
+        return vol.Optional(key, description={"suggested_value": val})
+    return vol.Optional(key)
+
+
 def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Return schema for Tariff configuration."""
     return vol.Schema(
@@ -92,17 +100,16 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=[
-                        TARIFF_MODE_FIXED,
-                        TARIFF_MODE_TOU,
-                        TARIFF_MODE_DYNAMIC,
+                        selector.SelectOptionDict(value=TARIFF_MODE_FIXED, label="Tarif de Base Fixe"),
+                        selector.SelectOptionDict(value=TARIFF_MODE_TOU, label="Heures Pleines / Heures Creuses (HP/HC)"),
+                        selector.SelectOptionDict(value=TARIFF_MODE_DYNAMIC, label="Tarif Dynamique Horaire (Spot / Nordpool)"),
                     ],
-                    translation_key="tariff_mode",
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
             ),
             vol.Required(
                 CONF_GRID_IMPORT_PRICE_FIXED,
-                default=defaults.get(CONF_GRID_IMPORT_PRICE_FIXED, DEFAULT_IMPORT_PRICE),
+                default=float(defaults.get(CONF_GRID_IMPORT_PRICE_FIXED, DEFAULT_IMPORT_PRICE)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0.0, max=2.0, step=0.0001, unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
@@ -110,23 +117,21 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
             ),
             vol.Required(
                 CONF_GRID_EXPORT_PRICE_FIXED,
-                default=defaults.get(CONF_GRID_EXPORT_PRICE_FIXED, DEFAULT_EXPORT_PRICE),
+                default=float(defaults.get(CONF_GRID_EXPORT_PRICE_FIXED, DEFAULT_EXPORT_PRICE)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0.0, max=2.0, step=0.0001, unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
                 )
             ),
-            vol.Optional(
-                CONF_GRID_IMPORT_PRICE_ENTITY,
-                description={"suggested_value": defaults.get(CONF_GRID_IMPORT_PRICE_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
-            vol.Optional(
-                CONF_GRID_EXPORT_PRICE_ENTITY,
-                description={"suggested_value": defaults.get(CONF_GRID_EXPORT_PRICE_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "input_number"])),
+            _opt_marker(CONF_GRID_IMPORT_PRICE_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["sensor", "input_number"])
+            ),
+            _opt_marker(CONF_GRID_EXPORT_PRICE_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["sensor", "input_number"])
+            ),
             vol.Optional(
                 CONF_DYNAMIC_CHEAP_THRESHOLD,
-                default=defaults.get(CONF_DYNAMIC_CHEAP_THRESHOLD, DEFAULT_DYNAMIC_CHEAP_THRESHOLD),
+                default=float(defaults.get(CONF_DYNAMIC_CHEAP_THRESHOLD, DEFAULT_DYNAMIC_CHEAP_THRESHOLD)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=-1.0, max=1.0, step=0.005, unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
@@ -140,49 +145,42 @@ def get_felicity_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Return schema for Felicity Inverter & Battery (ha_felicity)."""
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_PV_POWER_ENTITY,
-                description={"suggested_value": defaults.get(CONF_PV_POWER_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_GRID_POWER_ENTITY,
-                description={"suggested_value": defaults.get(CONF_GRID_POWER_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_HOUSE_LOAD_ENTITY,
-                description={"suggested_value": defaults.get(CONF_HOUSE_LOAD_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_BATTERY_SOC_ENTITY,
-                description={"suggested_value": defaults.get(CONF_BATTERY_SOC_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_BATTERY_POWER_ENTITY,
-                description={"suggested_value": defaults.get(CONF_BATTERY_POWER_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_FELICITY_WORK_MODE_ENTITY,
-                description={"suggested_value": defaults.get(CONF_FELICITY_WORK_MODE_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["select", "input_select"])),
-            vol.Optional(
-                CONF_FELICITY_FORCE_CHARGE_ENTITY,
-                description={"suggested_value": defaults.get(CONF_FELICITY_FORCE_CHARGE_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["switch", "input_boolean"])),
+            _opt_marker(CONF_PV_POWER_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_GRID_POWER_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_HOUSE_LOAD_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_BATTERY_SOC_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_BATTERY_POWER_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_FELICITY_WORK_MODE_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["select", "input_select"])
+            ),
+            _opt_marker(CONF_FELICITY_FORCE_CHARGE_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+            ),
             vol.Required(
                 CONF_BATTERY_CAPACITY_KWH,
-                default=defaults.get(CONF_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_CAPACITY_KWH),
+                default=float(defaults.get(CONF_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_CAPACITY_KWH)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=1.0, max=100.0, step=0.5, unit_of_measurement="kWh")
             ),
             vol.Required(
                 CONF_BATTERY_MIN_SOC,
-                default=defaults.get(CONF_BATTERY_MIN_SOC, DEFAULT_BATTERY_MIN_SOC),
+                default=int(defaults.get(CONF_BATTERY_MIN_SOC, DEFAULT_BATTERY_MIN_SOC)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=5, max=50, step=1, unit_of_measurement="%")
             ),
             vol.Required(
                 CONF_BATTERY_TARGET_SOC_EV,
-                default=defaults.get(CONF_BATTERY_TARGET_SOC_EV, DEFAULT_BATTERY_TARGET_SOC_EV),
+                default=int(defaults.get(CONF_BATTERY_TARGET_SOC_EV, DEFAULT_BATTERY_TARGET_SOC_EV)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=20, max=100, step=5, unit_of_measurement="%")
             ),
@@ -194,71 +192,63 @@ def get_ecodan_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Return schema for Mitsubishi Ecodan Heat Pump (esphome-ecodan-hp)."""
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_ECODAN_POWER_ENTITY,
-                description={"suggested_value": defaults.get(CONF_ECODAN_POWER_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_DHW_TEMP_ENTITY,
-                description={"suggested_value": defaults.get(CONF_DHW_TEMP_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_DHW_TARGET_ENTITY,
-                description={"suggested_value": defaults.get(CONF_DHW_TARGET_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number", "water_heater"])),
-            vol.Optional(
-                CONF_DHW_FORCE_ENTITY,
-                description={"suggested_value": defaults.get(CONF_DHW_FORCE_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["switch", "button", "input_boolean"])),
+            _opt_marker(CONF_ECODAN_POWER_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_DHW_TEMP_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_DHW_TARGET_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["number", "input_number", "water_heater"])
+            ),
+            _opt_marker(CONF_DHW_FORCE_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "button", "input_boolean"])
+            ),
             vol.Required(
                 CONF_DHW_NORMAL_TEMP,
-                default=defaults.get(CONF_DHW_NORMAL_TEMP, DEFAULT_DHW_NORMAL_TEMP),
+                default=float(defaults.get(CONF_DHW_NORMAL_TEMP, DEFAULT_DHW_NORMAL_TEMP)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=40.0, max=60.0, step=0.5, unit_of_measurement="°C")
             ),
             vol.Required(
                 CONF_DHW_BOOST_TEMP,
-                default=defaults.get(CONF_DHW_BOOST_TEMP, DEFAULT_DHW_BOOST_TEMP),
+                default=float(defaults.get(CONF_DHW_BOOST_TEMP, DEFAULT_DHW_BOOST_TEMP)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=45.0, max=65.0, step=0.5, unit_of_measurement="°C")
             ),
             vol.Required(
                 CONF_DHW_SOLAR_WINDOW_START,
-                default=defaults.get(CONF_DHW_SOLAR_WINDOW_START, DEFAULT_DHW_WINDOW_START),
+                default=int(defaults.get(CONF_DHW_SOLAR_WINDOW_START, DEFAULT_DHW_WINDOW_START)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=23, step=1, unit_of_measurement="h")
             ),
             vol.Required(
                 CONF_DHW_SOLAR_WINDOW_END,
-                default=defaults.get(CONF_DHW_SOLAR_WINDOW_END, DEFAULT_DHW_WINDOW_END),
+                default=int(defaults.get(CONF_DHW_SOLAR_WINDOW_END, DEFAULT_DHW_WINDOW_END)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=23, step=1, unit_of_measurement="h")
             ),
-            vol.Optional(
-                CONF_Z1_TEMP_ENTITY,
-                description={"suggested_value": defaults.get(CONF_Z1_TEMP_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_Z1_TARGET_ENTITY,
-                description={"suggested_value": defaults.get(CONF_Z1_TARGET_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "number", "input_number"])),
+            _opt_marker(CONF_Z1_TEMP_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_Z1_TARGET_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["climate", "number", "input_number"])
+            ),
             vol.Optional(
                 CONF_Z1_ROOMS_ENTITIES,
                 default=defaults.get(CONF_Z1_ROOMS_ENTITIES, []),
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", multiple=True)
             ),
-            vol.Optional(
-                CONF_Z2_TEMP_ENTITY,
-                description={"suggested_value": defaults.get(CONF_Z2_TEMP_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_Z2_TARGET_ENTITY,
-                description={"suggested_value": defaults.get(CONF_Z2_TARGET_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "number", "input_number"])),
+            _opt_marker(CONF_Z2_TEMP_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_Z2_TARGET_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["climate", "number", "input_number"])
+            ),
             vol.Required(
                 CONF_Z2_MAX_OVERHEAT_OFFSET,
-                default=defaults.get(CONF_Z2_MAX_OVERHEAT_OFFSET, DEFAULT_Z2_MAX_OFFSET),
+                default=float(defaults.get(CONF_Z2_MAX_OVERHEAT_OFFSET, DEFAULT_Z2_MAX_OFFSET)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0.0, max=3.0, step=0.5, unit_of_measurement="°C")
             ),
@@ -270,51 +260,45 @@ def get_ev_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Return schema for Tesla Fleet & Local Tuya EVSE."""
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_EV_PLUGGED_ENTITY,
-                description={"suggested_value": defaults.get(CONF_EV_PLUGGED_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])),
-            vol.Optional(
-                CONF_EV_SOC_ENTITY,
-                description={"suggested_value": defaults.get(CONF_EV_SOC_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_EV_TARGET_SOC_ENTITY,
-                description={"suggested_value": defaults.get(CONF_EV_TARGET_SOC_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "sensor", "input_number"])),
-            vol.Optional(
-                CONF_TESLA_CHARGE_SWITCH,
-                description={"suggested_value": defaults.get(CONF_TESLA_CHARGE_SWITCH)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["switch", "input_boolean"])),
-            vol.Optional(
-                CONF_TESLA_CURRENT_NUMBER,
-                description={"suggested_value": defaults.get(CONF_TESLA_CURRENT_NUMBER)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number"])),
-            vol.Optional(
-                CONF_EVSE_POWER_SWITCH,
-                description={"suggested_value": defaults.get(CONF_EVSE_POWER_SWITCH)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["switch", "input_boolean"])),
+            _opt_marker(CONF_EV_PLUGGED_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])
+            ),
+            _opt_marker(CONF_EV_SOC_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_EV_TARGET_SOC_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["number", "sensor", "input_number"])
+            ),
+            _opt_marker(CONF_TESLA_CHARGE_SWITCH, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+            ),
+            _opt_marker(CONF_TESLA_CURRENT_NUMBER, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["number", "input_number"])
+            ),
+            _opt_marker(CONF_EVSE_POWER_SWITCH, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+            ),
             vol.Required(
                 CONF_EV_MIN_CURRENT,
-                default=defaults.get(CONF_EV_MIN_CURRENT, DEFAULT_EV_MIN_CURRENT),
+                default=int(defaults.get(CONF_EV_MIN_CURRENT, DEFAULT_EV_MIN_CURRENT)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=5, max=16, step=1, unit_of_measurement="A")
             ),
             vol.Required(
                 CONF_EV_MAX_CURRENT,
-                default=defaults.get(CONF_EV_MAX_CURRENT, DEFAULT_EV_MAX_CURRENT),
+                default=int(defaults.get(CONF_EV_MAX_CURRENT, DEFAULT_EV_MAX_CURRENT)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=6, max=32, step=1, unit_of_measurement="A")
             ),
             vol.Required(
                 CONF_EV_VOLTAGE,
-                default=defaults.get(CONF_EV_VOLTAGE, DEFAULT_EV_VOLTAGE),
+                default=int(defaults.get(CONF_EV_VOLTAGE, DEFAULT_EV_VOLTAGE)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=210, max=250, step=1, unit_of_measurement="V")
             ),
             vol.Required(
                 CONF_EV_RAMP_SECONDS,
-                default=defaults.get(CONF_EV_RAMP_SECONDS, DEFAULT_EV_RAMP_SECONDS),
+                default=int(defaults.get(CONF_EV_RAMP_SECONDS, DEFAULT_EV_RAMP_SECONDS)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=15, max=300, step=15, unit_of_measurement="s")
             ),
@@ -326,31 +310,27 @@ def get_forecast_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Return schema for Solcast / Open-Meteo & Machine Learning."""
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_OUTDOOR_TEMP_ENTITY,
-                description={"suggested_value": defaults.get(CONF_OUTDOOR_TEMP_ENTITY)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "weather"])),
-            vol.Optional(
-                CONF_SOLAR_FORECAST_TODAY_REMAINING,
-                description={"suggested_value": defaults.get(CONF_SOLAR_FORECAST_TODAY_REMAINING)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_SOLAR_FORECAST_TOMORROW,
-                description={"suggested_value": defaults.get(CONF_SOLAR_FORECAST_TOMORROW)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_SOLAR_FORECAST_DAY_AFTER,
-                description={"suggested_value": defaults.get(CONF_SOLAR_FORECAST_DAY_AFTER)},
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            _opt_marker(CONF_OUTDOOR_TEMP_ENTITY, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["sensor", "weather"])
+            ),
+            _opt_marker(CONF_SOLAR_FORECAST_TODAY_REMAINING, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_SOLAR_FORECAST_TOMORROW, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            _opt_marker(CONF_SOLAR_FORECAST_DAY_AFTER, defaults): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
             vol.Required(
                 CONF_ML_TRAINING_DAYS,
-                default=defaults.get(CONF_ML_TRAINING_DAYS, DEFAULT_ML_TRAINING_DAYS),
+                default=int(defaults.get(CONF_ML_TRAINING_DAYS, DEFAULT_ML_TRAINING_DAYS)),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=30, max=1095, step=30, unit_of_measurement="jours")
             ),
             vol.Required(
                 CONF_ML_AUTO_TRAIN,
-                default=defaults.get(CONF_ML_AUTO_TRAIN, True),
+                default=bool(defaults.get(CONF_ML_AUTO_TRAIN, True)),
             ): selector.BooleanSelector(),
         }
     )
@@ -385,8 +365,16 @@ class EMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("setup_mode", default=SETUP_MODE_WIZARD): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[SETUP_MODE_WIZARD, SETUP_MODE_TABS],
-                            translation_key="setup_mode",
+                            options=[
+                                selector.SelectOptionDict(
+                                    value=SETUP_MODE_WIZARD,
+                                    label="Assistant pas-à-pas guidé (Recommandé)",
+                                ),
+                                selector.SelectOptionDict(
+                                    value=SETUP_MODE_TABS,
+                                    label="Menu libre par onglets thématiques",
+                                ),
+                            ],
                             mode=selector.SelectSelectorMode.LIST,
                         )
                     )
@@ -499,11 +487,21 @@ class EMSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class EMSOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle EMS options via either Wizard or Thematic Tabs."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(self, config_entry: config_entries.ConfigEntry | None = None) -> None:
         """Initialize EMS options flow."""
-        self.config_entry = config_entry
-        self._options: dict[str, Any] = {**config_entry.data, **config_entry.options}
+        if config_entry is not None:
+            self.config_entry = config_entry
+            self._options: dict[str, Any] = {**config_entry.data, **config_entry.options}
+        else:
+            self._options = {}
         self._mode: str = SETUP_MODE_TABS
+
+    @property
+    def options(self) -> dict[str, Any]:
+        """Return options dictionary."""
+        if not self._options and hasattr(self, "config_entry") and self.config_entry:
+            self._options = {**self.config_entry.data, **self.config_entry.options}
+        return self._options
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -526,14 +524,14 @@ class EMSOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Edit Tariff options."""
         if user_input is not None:
-            self._options.update(user_input)
+            self.options.update(user_input)
             if self._mode == SETUP_MODE_WIZARD:
                 return await self.async_step_felicity()
             return await self.async_step_init()
 
         return self.async_show_form(
             step_id="tariff",
-            data_schema=get_tariff_schema(self._options),
+            data_schema=get_tariff_schema(self.options),
         )
 
     async def async_step_felicity(
@@ -541,14 +539,14 @@ class EMSOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Edit Felicity Inverter & Battery options."""
         if user_input is not None:
-            self._options.update(user_input)
+            self.options.update(user_input)
             if self._mode == SETUP_MODE_WIZARD:
                 return await self.async_step_ecodan()
             return await self.async_step_init()
 
         return self.async_show_form(
             step_id="felicity",
-            data_schema=get_felicity_schema(self._options),
+            data_schema=get_felicity_schema(self.options),
         )
 
     async def async_step_ecodan(
@@ -556,14 +554,14 @@ class EMSOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Edit Mitsubishi Ecodan options."""
         if user_input is not None:
-            self._options.update(user_input)
+            self.options.update(user_input)
             if self._mode == SETUP_MODE_WIZARD:
                 return await self.async_step_ev()
             return await self.async_step_init()
 
         return self.async_show_form(
             step_id="ecodan",
-            data_schema=get_ecodan_schema(self._options),
+            data_schema=get_ecodan_schema(self.options),
         )
 
     async def async_step_ev(
@@ -571,14 +569,14 @@ class EMSOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Edit EV & Tesla Fleet options."""
         if user_input is not None:
-            self._options.update(user_input)
+            self.options.update(user_input)
             if self._mode == SETUP_MODE_WIZARD:
                 return await self.async_step_forecast()
             return await self.async_step_init()
 
         return self.async_show_form(
             step_id="ev",
-            data_schema=get_ev_schema(self._options),
+            data_schema=get_ev_schema(self.options),
         )
 
     async def async_step_forecast(
@@ -586,18 +584,18 @@ class EMSOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Edit Forecast & ML options."""
         if user_input is not None:
-            self._options.update(user_input)
+            self.options.update(user_input)
             if self._mode == SETUP_MODE_WIZARD:
                 return await self.async_step_save()
             return await self.async_step_init()
 
         return self.async_show_form(
             step_id="forecast",
-            data_schema=get_forecast_schema(self._options),
+            data_schema=get_forecast_schema(self.options),
         )
 
     async def async_step_save(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Save updated options."""
-        return self.async_create_entry(title="", data=self._options)
+        return self.async_create_entry(title="", data=self.options)
