@@ -19,6 +19,7 @@ from custom_components.ems.const import (
     CONF_TESLA_CHARGE_SWITCH,
     CONF_TESLA_CURRENT_NUMBER,
     CONF_EVSE_POWER_SWITCH,
+    CONF_EVSE_CURRENT_NUMBER,
     CONF_FELICITY_FORCE_CHARGE_ENTITY,
     CONF_FELICITY_WORK_MODE_ENTITY,
     TARIFF_MODE_FIXED,
@@ -133,6 +134,75 @@ class TestSmartResidentialEMS(unittest.TestCase):
         )
         self.assertTrue(charging)
         self.assertEqual(amps, 6)
+
+    def test_tuya_local_evse_select_and_current_control(self) -> None:
+        """Verify that Tuya Local select entity (Start charging/Stop charging) and EVSE current setpoint work."""
+        config = {
+            CONF_TESLA_CHARGE_SWITCH: "switch.sally_charge",
+            CONF_TESLA_CURRENT_NUMBER: "number.sally_courant_de_recharge",
+            CONF_EVSE_POWER_SWITCH: "select.garage_borne_voiture_toggle_charging",
+            CONF_EVSE_CURRENT_NUMBER: "number.garage_borne_voiture_set_charge_current",
+            "ev_min_current": 6,
+            "ev_max_current": 16,
+            "ev_voltage": 230,
+            "ev_ramp_seconds": 60,
+        }
+        ctrl = TeslaController(config)
+        t0 = datetime(2026, 5, 10, 12, 0, 0)
+
+        # 1. Start charging -> should call select_option "Start charging" and set both vehicle & EVSE numbers
+        charging, amps, cmds = ctrl.compute_charging_step(
+            now=t0,
+            ev_plugged=True,
+            ev_soc=45.0,
+            ev_target_soc=80.0,
+            available_power_for_ev_watts=2300.0,
+        )
+        self.assertTrue(charging)
+        self.assertEqual(amps, 6)
+        # Verify select_option was issued for Tuya EVSE select
+        self.assertTrue(any(
+            c["entity_id"] == "select.garage_borne_voiture_toggle_charging"
+            and c["domain"] == "select"
+            and c["service"] == "select_option"
+            and c["data"]["option"] == "Start charging"
+            for c in cmds
+        ))
+        # Verify EVSE current setpoint
+        self.assertTrue(any(
+            c["entity_id"] == "number.garage_borne_voiture_set_charge_current"
+            and c["domain"] == "number"
+            and c["data"]["value"] == 6.0
+            for c in cmds
+        ))
+        # Verify Tesla switch & number
+        self.assertTrue(any(c["entity_id"] == "switch.sally_charge" and c["service"] == "turn_on" for c in cmds))
+        self.assertTrue(any(c["entity_id"] == "number.sally_courant_de_recharge" and c["data"]["value"] == 6 for c in cmds))
+
+        # 2. Stop charging -> should send "Stop charging" to Tuya EVSE select and turn_off to vehicle
+        ctrl.charge_started_at = t0 - timedelta(minutes=5)  # past anti-short-cycle
+        t_stop = t0 + timedelta(minutes=5)
+        charging, amps, stop_cmds = ctrl.compute_charging_step(
+            now=t_stop,
+            ev_plugged=True,
+            ev_soc=80.0,  # reached target SOC
+            ev_target_soc=80.0,
+            available_power_for_ev_watts=0.0,
+        )
+        self.assertFalse(charging)
+        self.assertEqual(amps, 0)
+        self.assertTrue(any(
+            c["entity_id"] == "select.garage_borne_voiture_toggle_charging"
+            and c["domain"] == "select"
+            and c["service"] == "select_option"
+            and c["data"]["option"] == "Stop charging"
+            for c in stop_cmds
+        ))
+        self.assertTrue(any(
+            c["entity_id"] == "switch.sally_charge"
+            and c["service"] == "turn_off"
+            for c in stop_cmds
+        ))
 
     def test_tariff_evolution_fixed_to_dynamic(self) -> None:
         """Verify seamless switch from Fixed (16.89c€ / 4c€) to Dynamic pricing."""

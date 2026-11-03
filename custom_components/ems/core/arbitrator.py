@@ -73,11 +73,15 @@ class EnergyArbitrator:
         predicted_24h_kwh: float,
         predicted_overnight_kwh: float,
         live_states: dict[str, Any],
+        ev_measured_power_w: float = 0.0,
     ) -> dict[str, Any]:
         """Run one full arbitration cycle and return state metrics + hardware commands."""
         # 1. Calculate raw and smoothed solar surplus
         # Net surplus available before battery charging and before EV charging
-        ev_current_power_w = self.tesla.current_amps * self.tesla.voltage if self.tesla.is_charging else 0.0
+        if ev_measured_power_w > 50.0:
+            ev_current_power_w = ev_measured_power_w
+        else:
+            ev_current_power_w = self.tesla.current_amps * self.tesla.voltage if self.tesla.is_charging else 0.0
         base_house_without_ev_w = max(0.0, house_load_w - ev_current_power_w)
         raw_surplus_w = pv_power_w - base_house_without_ev_w
         self._surplus_window.append(raw_surplus_w)

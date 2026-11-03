@@ -10,6 +10,7 @@ from ...const import (
     CONF_TESLA_CHARGE_SWITCH,
     CONF_TESLA_CURRENT_NUMBER,
     CONF_EVSE_POWER_SWITCH,
+    CONF_EVSE_CURRENT_NUMBER,
     CONF_EV_MIN_CURRENT,
     CONF_EV_MAX_CURRENT,
     CONF_EV_VOLTAGE,
@@ -81,10 +82,11 @@ class TeslaController:
         charge_switch = self.config.get(CONF_TESLA_CHARGE_SWITCH)
         current_number = self.config.get(CONF_TESLA_CURRENT_NUMBER)
         evse_switch = self.config.get(CONF_EVSE_POWER_SWITCH)
+        evse_current_number = self.config.get(CONF_EVSE_CURRENT_NUMBER)
 
         if not ev_plugged or ev_soc >= ev_target_soc:
             if self.is_charging:
-                self._append_stop_commands(commands, charge_switch)
+                self._append_stop_commands(commands, charge_switch, evse_switch)
                 self.is_charging = False
                 self.current_amps = 0
             return False, 0, commands
@@ -116,9 +118,11 @@ class TeslaController:
                     # Step down gently towards min_amps first
                     self.current_amps = max(self.min_amps, self.current_amps - 1)
                     self.last_step_time = now
-                    self._append_amp_command(commands, current_number, self.current_amps)
+                    self._append_amp_command(
+                        commands, current_number, evse_current_number, self.current_amps
+                    )
                 elif self.current_amps <= self.min_amps and min_run_ok and can_step:
-                    self._append_stop_commands(commands, charge_switch)
+                    self._append_stop_commands(commands, charge_switch, evse_switch)
                     self.is_charging = False
                     self.current_amps = 0
                     self.last_step_time = now
@@ -131,26 +135,12 @@ class TeslaController:
                 self.current_amps = self.min_amps if not force_max_charge else self.max_amps
                 self.charge_started_at = now
                 self.last_step_time = now
-                # Ensure Local Tuya EVSE power switch is ON (never modulate current on Tuya, only via Tesla Fleet)
-                if evse_switch:
-                    commands.append(
-                        {
-                            "domain": evse_switch.split(".")[0],
-                            "service": "turn_on",
-                            "entity_id": evse_switch,
-                            "reason": "Ensure Tuya EVSE supply is enabled",
-                        }
-                    )
-                self._append_amp_command(commands, current_number, self.current_amps)
-                if charge_switch:
-                    commands.append(
-                        {
-                            "domain": charge_switch.split(".")[0],
-                            "service": "turn_on",
-                            "entity_id": charge_switch,
-                            "reason": "Start Tesla solar charging at minimum current",
-                        }
-                    )
+
+                # Ensure EVSE supply is enabled (supports select e.g. Tuya toggle_charging or switch)
+                self._append_start_commands(commands, charge_switch, evse_switch)
+                self._append_amp_command(
+                    commands, current_number, evse_current_number, self.current_amps
+                )
             return self.is_charging, self.current_amps, commands
 
         # Case 3: Already charging -> modulate smoothly by +1A or -1A per ramp interval
@@ -166,39 +156,114 @@ class TeslaController:
                 self.current_amps = max(self.min_amps, self.current_amps - 1)
 
             self.last_step_time = now
-            self._append_amp_command(commands, current_number, self.current_amps)
+            self._append_amp_command(
+                commands, current_number, evse_current_number, self.current_amps
+            )
 
         return self.is_charging, self.current_amps, commands
 
     @staticmethod
     def _append_amp_command(
-        commands: list[dict[str, Any]], current_number: str | None, amps: int
+        commands: list[dict[str, Any]],
+        current_number: str | None,
+        evse_current_number: str | None,
+        amps: int,
     ) -> None:
-        if not current_number:
-            return
-        domain = current_number.split(".")[0]
-        commands.append(
-            {
-                "domain": domain,
-                "service": "set_value",
-                "entity_id": current_number,
-                "data": {"value": amps},
-                "reason": f"Adjust Tesla charging current to {amps}A via Tesla Fleet",
-            }
-        )
+        if current_number:
+            domain = current_number.split(".")[0]
+            commands.append(
+                {
+                    "domain": domain,
+                    "service": "set_value",
+                    "entity_id": current_number,
+                    "data": {"value": amps},
+                    "reason": f"Adjust vehicle charging current to {amps}A via {domain}",
+                }
+            )
+        if evse_current_number:
+            domain = evse_current_number.split(".")[0]
+            commands.append(
+                {
+                    "domain": domain,
+                    "service": "set_value",
+                    "entity_id": evse_current_number,
+                    "data": {"value": float(amps)},
+                    "reason": f"Adjust Tuya EVSE setpoint current to {amps}A",
+                }
+            )
+
+    @staticmethod
+    def _append_start_commands(
+        commands: list[dict[str, Any]],
+        charge_switch: str | None,
+        evse_switch: str | None,
+    ) -> None:
+        if evse_switch:
+            domain = evse_switch.split(".")[0]
+            if domain == "select":
+                commands.append(
+                    {
+                        "domain": "select",
+                        "service": "select_option",
+                        "entity_id": evse_switch,
+                        "data": {"option": "Start charging"},
+                        "reason": "Start charging on Tuya EVSE select",
+                    }
+                )
+            elif domain in ("switch", "input_boolean"):
+                commands.append(
+                    {
+                        "domain": domain,
+                        "service": "turn_on",
+                        "entity_id": evse_switch,
+                        "reason": "Ensure Tuya EVSE supply is enabled",
+                    }
+                )
+        if charge_switch:
+            domain = charge_switch.split(".")[0]
+            commands.append(
+                {
+                    "domain": domain,
+                    "service": "turn_on",
+                    "entity_id": charge_switch,
+                    "reason": "Start vehicle charging",
+                }
+            )
 
     @staticmethod
     def _append_stop_commands(
-        commands: list[dict[str, Any]], charge_switch: str | None
+        commands: list[dict[str, Any]],
+        charge_switch: str | None,
+        evse_switch: str | None = None,
     ) -> None:
-        if not charge_switch:
-            return
-        domain = charge_switch.split(".")[0]
-        commands.append(
-            {
-                "domain": domain,
-                "service": "turn_off",
-                "entity_id": charge_switch,
-                "reason": "Stop Tesla charging cleanly via Tesla Fleet",
-            }
-        )
+        if charge_switch:
+            domain = charge_switch.split(".")[0]
+            commands.append(
+                {
+                    "domain": domain,
+                    "service": "turn_off",
+                    "entity_id": charge_switch,
+                    "reason": "Stop vehicle charging cleanly",
+                }
+            )
+        if evse_switch:
+            domain = evse_switch.split(".")[0]
+            if domain == "select":
+                commands.append(
+                    {
+                        "domain": "select",
+                        "service": "select_option",
+                        "entity_id": evse_switch,
+                        "data": {"option": "Stop charging"},
+                        "reason": "Stop charging on Tuya EVSE select",
+                    }
+                )
+            elif domain in ("switch", "input_boolean"):
+                commands.append(
+                    {
+                        "domain": domain,
+                        "service": "turn_off",
+                        "entity_id": evse_switch,
+                        "reason": "Turn off EVSE power supply",
+                    }
+                )

@@ -27,6 +27,7 @@ from .const import (
     CONF_EV_PLUGGED_ENTITY,
     CONF_EV_SOC_ENTITY,
     CONF_EV_TARGET_SOC_ENTITY,
+    CONF_EVSE_POWER_ENTITY,
     CONF_OUTDOOR_TEMP_ENTITY,
     CONF_SOLAR_FORECAST_TODAY_REMAINING,
     CONF_SOLAR_FORECAST_TOMORROW,
@@ -133,13 +134,42 @@ class EMSDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
 
     def _read_bool(self, entity_id: str | None, default: bool = False) -> bool:
-        """Safely read a boolean state."""
+        """Safely read a boolean or connectivity state."""
         if not entity_id:
             return default
         state_obj = self.hass.states.get(entity_id)
         if state_obj is None or state_obj.state in ("unknown", "unavailable", None):
             return default
-        return str(state_obj.state).lower() in ("on", "true", "connected", "plugged", "1", "charging")
+        val = str(state_obj.state).lower().strip()
+        plugged_states = (
+            "on",
+            "true",
+            "connected",
+            "plugged",
+            "plugged_in",
+            "charging",
+            "waiting",
+            "waiting_for_authorization",
+            "charged",
+            "1",
+        )
+        return val in plugged_states
+
+    def _read_power_watts(self, entity_id: str | None, default: float = 0.0) -> float:
+        """Safely read power in Watts, converting from kW if needed."""
+        if not entity_id:
+            return default
+        state_obj = self.hass.states.get(entity_id)
+        if state_obj is None or state_obj.state in ("unknown", "unavailable", None):
+            return default
+        try:
+            val = float(state_obj.state)
+        except (ValueError, TypeError):
+            return default
+        unit = str(state_obj.attributes.get("unit_of_measurement", "")).strip().lower()
+        if unit == "kw":
+            return val * 1000.0
+        return val
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch latest sensor states, run ML prediction + arbitration, and dispatch commands."""
@@ -228,6 +258,7 @@ class EMSDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             predicted_24h_kwh=pred_24h_kwh,
             predicted_overnight_kwh=pred_overnight_kwh,
             live_states=live_states,
+            ev_measured_power_w=self._read_power_watts(self.config.get(CONF_EVSE_POWER_ENTITY)),
         )
 
         # Accumulate financial savings over time

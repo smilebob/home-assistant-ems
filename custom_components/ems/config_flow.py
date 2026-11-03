@@ -53,6 +53,8 @@ from .const import (
     CONF_TESLA_CHARGE_SWITCH,
     CONF_TESLA_CURRENT_NUMBER,
     CONF_EVSE_POWER_SWITCH,
+    CONF_EVSE_CURRENT_NUMBER,
+    CONF_EVSE_POWER_ENTITY,
     CONF_EV_MIN_CURRENT,
     CONF_EV_MAX_CURRENT,
     CONF_EV_VOLTAGE,
@@ -247,6 +249,8 @@ def get_ev_schema(defaults: dict[str, Any]) -> vol.Schema:
             _opt_marker(CONF_TESLA_CHARGE_SWITCH, defaults): selector.EntitySelector(),
             _opt_marker(CONF_TESLA_CURRENT_NUMBER, defaults): selector.EntitySelector(),
             _opt_marker(CONF_EVSE_POWER_SWITCH, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_EVSE_CURRENT_NUMBER, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_EVSE_POWER_ENTITY, defaults): selector.EntitySelector(),
             vol.Required(
                 CONF_EV_MIN_CURRENT,
                 default=int(defaults.get(CONF_EV_MIN_CURRENT, DEFAULT_EV_MIN_CURRENT)),
