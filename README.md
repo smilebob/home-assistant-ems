@@ -81,15 +81,15 @@ Chaque paramètre ci-dessous est modifiable dans **Configurer** :
 ### Onglet 2 : Onduleur Hybride & Batterie 15 kWh (`felicity`)
 | Paramètre | Description | Entité configurée sur votre installation |
 | :--- | :--- | :--- |
-| `pv_power_entity` | Puissance solaire PV totale produite (W) — *utilisée aussi par le ML de calibration solaire* | `sensor.felicity_inverter_100202001625330111_pv_total_power` |
-| `grid_power_entity` | Puissance réseau (W, positif = achat, négatif = injection) | `sensor.felicity_inverter_100202001625330111_total_grid_power` |
-| `house_load_entity` | Consommation totale de la maison (W) — *utilisée par le ML de consommation* | `sensor.felicity_inverter_100202001625330111_home_load_power` |
-| `battery_soc_entity` | État de charge (SOC %) de la batterie 15 kWh | `sensor.felicity_inverter_100202001625330111_battery_soc` |
-| `battery_power_entity` | Puissance batterie (W) | `sensor.felicity_inverter_100202001625330111_battery_power` |
+| `pv_power_entity` | Puissance solaire PV totale produite (W) — *utilisée aussi par le ML de calibration solaire* | `sensor.felicity_inverter_total_pv_power` |
+| `grid_power_entity` | Puissance réseau (W, positif = achat, négatif = injection) | `sensor.felicity_inverter_total_ac_input_power` |
+| `house_load_entity` | Consommation totale de la maison (W) — *utilisée par le ML de consommation* | `sensor.felicity_inverter_loadpower_lineside` |
+| `battery_soc_entity` | État de charge (SOC %) de la batterie 15 kWh | `sensor.felicity_inverter_battery_capacity` |
+| `battery_power_entity` | Puissance batterie (W) | `sensor.felicity_inverter_battery_power` |
 | `felicity_work_mode_entity` | Sélecteur du mode de fonctionnement de l'onduleur Felicity | `select.felicity_inverter_operating_mode` |
 | `felicity_force_charge_entity` | Switch ou Select d'activation de la règle de charge réseau | `select.felicity_inverter_economic_mode_rule_1_enable` |
 | `battery_capacity_kwh` | Capacité nominale du parc batterie (kWh) | `15.0` |
-| `battery_min_soc` | SOC minimum de réserve de sécurité (%) | `15 %` |
+| `battery_min_soc` | SOC minimum de réserve de sécurité (%) | `20 %` |
 | `battery_target_soc_ev` | SOC batterie minimum de référence avant d'autoriser le surplus vers la voiture (%) | `80 %` |
 | `battery_thermal_soc_threshold` | **Seuil SOC Batterie Pleine (%)** requis avant d'activer le stockage par inertie thermique (Priorité 4) | `95 %` |
 
