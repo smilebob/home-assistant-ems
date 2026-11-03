@@ -11,11 +11,11 @@ class SmartResidentialEMSCard extends HTMLElement {
   setConfig(config) {
     this._config = {
       title: config.title || "Smart Residential EMS",
-      entity: config.entity || "sensor.ems_active_priority_state",
-      auto_switch: config.auto_switch || "switch.ems_autonomous_optimization",
-      dhw_switch: config.dhw_switch || "switch.ems_force_ecodan_dhw_boost_55_c",
-      tesla_switch: config.tesla_switch || "switch.ems_force_tesla_max_charge",
-      thermal_switch: config.thermal_switch || "switch.ems_allow_zone_2_underfloor_thermal_storage",
+      entity: config.entity || "sensor.smart_residential_ems_ems_active_priority_state",
+      auto_switch: config.auto_switch || "switch.smart_residential_ems_ems_autonomous_optimization",
+      dhw_switch: config.dhw_switch || "switch.smart_residential_ems_ems_force_ecodan_dhw_boost_55degc",
+      tesla_switch: config.tesla_switch || "switch.smart_residential_ems_ems_force_tesla_max_charge",
+      thermal_switch: config.thermal_switch || "switch.smart_residential_ems_ems_allow_zone_2_underfloor_thermal_storage",
       ...config,
     };
     if (!this.shadowRoot) {
