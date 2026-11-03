@@ -156,7 +156,8 @@ class RecorderDatasetBuilder:
                 end_time=end_time,
                 entity_ids=entities,
                 include_start_time_state=True,
-                minimal_response=True,
+                minimal_response=False,
+                no_attributes=True,
             )
 
         try:
@@ -203,7 +204,8 @@ class RecorderDatasetBuilder:
                 end_time=end_time,
                 entity_ids=entities,
                 include_start_time_state=True,
-                minimal_response=True,
+                minimal_response=False,
+                no_attributes=True,
             )
 
         try:
@@ -219,6 +221,27 @@ class RecorderDatasetBuilder:
             outdoor_temp_entity=outdoor_temp_entity,
         )
 
+    @staticmethod
+    def _extract_val_and_ts(state_obj: Any) -> tuple[float, datetime] | None:
+        """Extract numeric state and UTC datetime from either a HA State object or minimal dict."""
+        try:
+            if isinstance(state_obj, dict):
+                raw_s = state_obj.get("state", state_obj.get("s"))
+                raw_ts = state_obj.get("last_updated", state_obj.get("lu"))
+                val = float(raw_s)
+                if isinstance(raw_ts, (int, float)):
+                    ts = datetime.fromtimestamp(raw_ts, tz=timezone.utc)
+                elif isinstance(raw_ts, str):
+                    ts = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                else:
+                    return None
+                return val, ts
+            val = float(state_obj.state)
+            ts = state_obj.last_updated
+            return val, ts
+        except (ValueError, TypeError, AttributeError):
+            return None
+
     def _align_solar_records(
         self,
         history_data: dict[str, list[Any]],
@@ -233,15 +256,14 @@ class RecorderDatasetBuilder:
             if not entity_id or entity_id not in history_data:
                 return
             for state_obj in history_data[entity_id]:
-                try:
-                    val = float(state_obj.state)
-                    ts: datetime = state_obj.last_updated
-                    hour_bucket = ts.replace(minute=0, second=0, microsecond=0)
-                    if hour_bucket not in buckets:
-                        buckets[hour_bucket] = {}
-                    buckets[hour_bucket].setdefault(key, []).append(val)
-                except (ValueError, TypeError, AttributeError):
+                extracted = self._extract_val_and_ts(state_obj)
+                if extracted is None:
                     continue
+                val, ts = extracted
+                hour_bucket = ts.replace(minute=0, second=0, microsecond=0)
+                if hour_bucket not in buckets:
+                    buckets[hour_bucket] = {}
+                buckets[hour_bucket].setdefault(key, []).append(val)
 
         _ingest_entity(pv_power_entity, "pv")
         _ingest_entity(solcast_power_entity, "solcast")
@@ -291,15 +313,14 @@ class RecorderDatasetBuilder:
             if not entity_id or entity_id not in history_data:
                 return
             for state_obj in history_data[entity_id]:
-                try:
-                    val = float(state_obj.state)
-                    ts: datetime = state_obj.last_updated
-                    hour_bucket = ts.replace(minute=0, second=0, microsecond=0)
-                    if hour_bucket not in buckets:
-                        buckets[hour_bucket] = {}
-                    buckets[hour_bucket].setdefault(key, []).append(val)
-                except (ValueError, TypeError, AttributeError):
+                extracted = self._extract_val_and_ts(state_obj)
+                if extracted is None:
                     continue
+                val, ts = extracted
+                hour_bucket = ts.replace(minute=0, second=0, microsecond=0)
+                if hour_bucket not in buckets:
+                    buckets[hour_bucket] = {}
+                buckets[hour_bucket].setdefault(key, []).append(val)
 
         _ingest_entity(load_entity, "load")
         _ingest_entity(ecodan_power_entity, "ecodan")

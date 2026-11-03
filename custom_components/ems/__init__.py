@@ -82,5 +82,7 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry when options are updated."""
     if entry.entry_id in hass.data.get(DOMAIN, {}):
         coordinator = hass.data[DOMAIN][entry.entry_id]
-        coordinator.update_configuration({**entry.data, **entry.options})
+        data = entry.data or {}
+        options = entry.options or {}
+        coordinator.update_configuration({**data, **options})
         await coordinator.async_request_refresh()

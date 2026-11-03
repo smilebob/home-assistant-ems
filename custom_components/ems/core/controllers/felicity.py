@@ -25,6 +25,7 @@ class FelicityController:
     def __init__(self, config: dict[str, Any]) -> None:
         """Initialize Felicity controller."""
         self.config = config
+        self._last_forced_state: bool | None = None
 
     def update_config(self, config: dict[str, Any]) -> None:
         """Update configuration."""
@@ -82,26 +83,49 @@ class FelicityController:
         commands: list[dict[str, Any]] = []
         force_switch = self.config.get(CONF_FELICITY_FORCE_CHARGE_ENTITY)
         work_mode_select = self.config.get(CONF_FELICITY_WORK_MODE_ENTITY)
+        active_force = bool(should_force_grid_charge and current_soc < 95.0)
+
+        if self._last_forced_state == active_force:
+            return commands
+        self._last_forced_state = active_force
 
         if force_switch:
-            target_state = "turn_on" if (should_force_grid_charge and current_soc < 95.0) else "turn_off"
-            commands.append(
-                {
-                    "domain": force_switch.split(".")[0],
-                    "service": target_state,
-                    "entity_id": force_switch,
-                    "reason": "Dynamic/Off-Peak cheap grid charge" if should_force_grid_charge else "Self-consumption mode",
-                }
-            )
+            domain = force_switch.split(".")[0]
+            if domain in ("select", "input_select"):
+                commands.append(
+                    {
+                        "domain": domain,
+                        "service": "select_option",
+                        "entity_id": force_switch,
+                        "data": {"option": "Charge" if active_force else "Disabled"},
+                        "reason": "Dynamic/Off-Peak cheap grid charge" if active_force else "Self-consumption mode",
+                    }
+                )
+            else:
+                target_state = "turn_on" if active_force else "turn_off"
+                commands.append(
+                    {
+                        "domain": domain,
+                        "service": target_state,
+                        "entity_id": force_switch,
+                        "reason": "Dynamic/Off-Peak cheap grid charge" if active_force else "Self-consumption mode",
+                    }
+                )
 
-        if work_mode_select and should_force_grid_charge:
+        if work_mode_select:
+            domain = work_mode_select.split(".")[0]
+            option = (
+                "Economic mode (scheduled charge-discharge)"
+                if active_force
+                else "General mode (self-use, load priority)"
+            )
             commands.append(
                 {
-                    "domain": work_mode_select.split(".")[0],
+                    "domain": domain,
                     "service": "select_option",
                     "entity_id": work_mode_select,
-                    "data": {"option": "Economic"},
-                    "reason": "Switch Felicity to Economic mode for scheduled/dynamic charging",
+                    "data": {"option": option},
+                    "reason": "Switch Felicity operating mode",
                 }
             )
 

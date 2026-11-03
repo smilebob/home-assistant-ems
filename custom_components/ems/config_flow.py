@@ -162,7 +162,7 @@ def get_felicity_schema(defaults: dict[str, Any]) -> vol.Schema:
                 selector.EntitySelectorConfig(domain=["select", "input_select"])
             ),
             _opt_marker(CONF_FELICITY_FORCE_CHARGE_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
+                selector.EntitySelectorConfig(domain=["switch", "input_boolean", "select", "input_select"])
             ),
             vol.Required(
                 CONF_BATTERY_CAPACITY_KWH,
