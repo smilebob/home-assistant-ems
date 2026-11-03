@@ -50,7 +50,9 @@ class EMSDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Initialize the EMS coordinator."""
         self.hass = hass
         self.entry = entry
-        self.config: dict[str, Any] = {**entry.data, **entry.options}
+        data = entry.data or {}
+        options = entry.options or {}
+        self.config: dict[str, Any] = {**data, **options}
 
         storage_dir = hass.config.path(".storage")
         model_path = os.path.join(storage_dir, "ems_ml_model.pkl")
