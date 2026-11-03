@@ -454,22 +454,21 @@ class EMSOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry | None = None) -> None:
         """Initialize EMS options flow."""
-        if config_entry is not None:
-            self.config_entry = config_entry
-            data = config_entry.data or {}
-            options = config_entry.options or {}
-            self._options: dict[str, Any] = {**data, **options}
-        else:
-            self._options = {}
+        self._entry = config_entry
+        data = (config_entry.data if config_entry else None) or {}
+        options = (config_entry.options if config_entry else None) or {}
+        self._options: dict[str, Any] = {**data, **options}
         self._mode: str = SETUP_MODE_TABS
 
     @property
     def options(self) -> dict[str, Any]:
         """Return options dictionary."""
-        if not self._options and hasattr(self, "config_entry") and self.config_entry:
-            data = self.config_entry.data or {}
-            options = self.config_entry.options or {}
-            self._options = {**data, **options}
+        if not self._options:
+            entry = self._entry or getattr(self, "config_entry", None)
+            if entry:
+                data = entry.data or {}
+                options = entry.options or {}
+                self._options = {**data, **options}
         return self._options
 
     async def async_step_init(
