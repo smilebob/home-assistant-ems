@@ -1,6 +1,6 @@
 # 🧠 Mémoire Globale du Projet : Smart Residential EMS (`home-assistant-ems`)
 
-> **Dernière MAJ** : 2026-11-03 | **Statut** : Prêt pour Production (V1.0.0)
+> **Dernière MAJ** : 2026-11-03 | **Statut** : Déployé en Production (V1.1.1)
 
 ## 🎯 Vue d'Ensemble & Objectif
 - **Description** : Intégration HACS native pour Home Assistant optimisant l'autoconsommation d'une installation photovoltaïque (7 kWc) + batterie 15 kWh (`ha_felicity`), d'une PAC air-eau Mitsubishi Ecodan bi-zone + ECS (`esphome-ecodan-hp`), et d'une recharge véhicule électrique (`teslafleet` + borne `local_tuya`), pilotée par prévisions Solcast (J+0 à J+2) et Machine Learning local (entraîné sur 2 ans d'historique Recorder).
@@ -24,13 +24,14 @@
 
 ## 📌 État Actuel & Feuille de Route
 ### ✅ Implémenté
-- [x] **Configuration UI Hybride** : Assistant guidé (Wizard) + Menu par onglets thématiques ([`config_flow.py`](file:///home/pierre/Projets/ems/custom_components/ems/config_flow.py)) avec traductions FR/EN.
-- [x] **Machine Learning Local (2 ans d'historique)** : Extraction `RecorderDatasetBuilder` + `ConsumptionMLModel` ([`ml/`](file:///home/pierre/Projets/ems/custom_components/ems/ml/MEMORY.md)).
-- [x] **Cascade d'Arbitrage 4 Priorités** :
-  1. Confort thermique & ECS solaire (11h–15h).
-  2. Batterie Felicity 15 kWh jusqu'au SOC dynamique (calculé selon Solcast J+0/J+1 et conso nocturne ML).
-  3. Recharge Tesla modulée pas à pas (5A–16A via `teslafleet`).
-  4. Stockage thermique d'inertie dans le plancher chauffant du salon (Zone 2, `+1°C`) et Boost ECS (`55°C`).
+- [x] **Configuration UI Hybride & Reconfiguration Sans Erreur** : Assistant guidé (Wizard) + Menu par onglets thématiques + `async_step_reconfigure` ([`config_flow.py`](file:///home/pierre/Projets/ems/custom_components/ems/config_flow.py)) avec traductions FR/EN.
+- [x] **Machine Learning Local (Consommation 13 features + Auto-Calibration Solaire Solcast)** : Extraction `RecorderDatasetBuilder` + `ConsumptionMLModel` (MAE W, Fiabilité %, R²) + `SolarCalibrationModel` (ratios horaires bayésiens d'ombrage + Random Forest) ([`ml/`](file:///home/pierre/Projets/ems/custom_components/ems/ml/MEMORY.md)).
+- [x] **Explicabilité & Conseiller Vannes Thermostatiques** : Capteur `decision_reason` avec journal glissant et capteur `valve_summary` analysant l'équilibrage des pièces de la Zone 1 (Éléonore, Gaston, Parents, SdB).
+- [x] **Cascade d'Arbitrage 4 Priorités & Séquencement Strict EV** :
+  1. Confort thermique & ECS solaire (11h–16h).
+  2. Batterie Felicity 15 kWh jusqu'au SOC dynamique.
+  3. Recharge VE avec séquencement strict : **Consigne courant Véhicule d'abord (`number.sally_courant_de_recharge`) $\rightarrow$ Attente confirmation état HA (timeout 15s) $\rightarrow$ Pilotage Borne Tuya (`number.garage_borne_voiture_set_charge_current` + `select.garage_borne_voiture_toggle_charging`)**.
+  4. Stockage thermique d'inertie (uniquement lorsque `battery_soc >= 95%`, réglable via `battery_thermal_soc_threshold`) dans le plancher chauffant du salon (Zone 2, `+1°C`) et Boost ECS (`55°C`).
 - [x] **Évolutivité Tarifaire** : Bascule transparente entre tarif Fixe (16,89 c€ achat / 4 c€ vente), HP/HC (`time_of_use`) et Spot Dynamique (`dynamic`).
 - [x] **Carte Lovelace Clé en Main** : [`ems-card.js`](file:///home/pierre/Projets/ems/custom_components/ems/frontend/ems-card.js) et suite de tests unitaires ([`tests/test_ems_core.py`](file:///home/pierre/Projets/ems/tests/test_ems_core.py)).
 
