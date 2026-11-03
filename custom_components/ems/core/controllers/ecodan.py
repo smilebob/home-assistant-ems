@@ -97,6 +97,16 @@ class EcodanController:
                         "reason": "Set DHW water_heater temperature",
                     }
                 )
+            elif domain == "climate":
+                commands.append(
+                    {
+                        "domain": "climate",
+                        "service": "set_temperature",
+                        "entity_id": dhw_target_entity,
+                        "data": {"temperature": target_temp},
+                        "reason": "Set DHW climate target temperature",
+                    }
+                )
 
         if should_heat and dhw_force_entity:
             domain = dhw_force_entity.split(".")[0]

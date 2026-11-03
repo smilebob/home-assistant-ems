@@ -120,12 +120,8 @@ def get_tariff_schema(defaults: dict[str, Any]) -> vol.Schema:
                     min=0.0, max=2.0, step=0.001, unit_of_measurement="cEUR/kWh"
                 )
             ),
-            _opt_marker(CONF_GRID_IMPORT_PRICE_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["sensor", "input_number"])
-            ),
-            _opt_marker(CONF_GRID_EXPORT_PRICE_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["sensor", "input_number"])
-            ),
+            _opt_marker(CONF_GRID_IMPORT_PRICE_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_GRID_EXPORT_PRICE_ENTITY, defaults): selector.EntitySelector(),
             vol.Optional(
                 CONF_DYNAMIC_CHEAP_THRESHOLD,
                 default=float(defaults.get(CONF_DYNAMIC_CHEAP_THRESHOLD, DEFAULT_DYNAMIC_CHEAP_THRESHOLD)),
@@ -195,12 +191,8 @@ def get_ecodan_schema(defaults: dict[str, Any]) -> vol.Schema:
             _opt_marker(CONF_DHW_TEMP_ENTITY, defaults): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor")
             ),
-            _opt_marker(CONF_DHW_TARGET_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["number", "input_number", "water_heater"])
-            ),
-            _opt_marker(CONF_DHW_FORCE_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["switch", "button", "input_boolean"])
-            ),
+            _opt_marker(CONF_DHW_TARGET_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_DHW_FORCE_ENTITY, defaults): selector.EntitySelector(),
             vol.Required(
                 CONF_DHW_NORMAL_TEMP,
                 default=float(defaults.get(CONF_DHW_NORMAL_TEMP, DEFAULT_DHW_NORMAL_TEMP)),
@@ -225,24 +217,16 @@ def get_ecodan_schema(defaults: dict[str, Any]) -> vol.Schema:
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=23, step=1, unit_of_measurement="h")
             ),
-            _opt_marker(CONF_Z1_TEMP_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            _opt_marker(CONF_Z1_TARGET_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["climate", "number", "input_number"])
-            ),
+            _opt_marker(CONF_Z1_TEMP_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_Z1_TARGET_ENTITY, defaults): selector.EntitySelector(),
             vol.Optional(
                 CONF_Z1_ROOMS_ENTITIES,
                 default=defaults.get(CONF_Z1_ROOMS_ENTITIES, []),
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", multiple=True)
             ),
-            _opt_marker(CONF_Z2_TEMP_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            _opt_marker(CONF_Z2_TARGET_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["climate", "number", "input_number"])
-            ),
+            _opt_marker(CONF_Z2_TEMP_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_Z2_TARGET_ENTITY, defaults): selector.EntitySelector(),
             vol.Required(
                 CONF_Z2_MAX_OVERHEAT_OFFSET,
                 default=float(defaults.get(CONF_Z2_MAX_OVERHEAT_OFFSET, DEFAULT_Z2_MAX_OFFSET)),
@@ -257,24 +241,12 @@ def get_ev_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Return schema for Tesla Fleet & Local Tuya EVSE."""
     return vol.Schema(
         {
-            _opt_marker(CONF_EV_PLUGGED_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])
-            ),
-            _opt_marker(CONF_EV_SOC_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            _opt_marker(CONF_EV_TARGET_SOC_ENTITY, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["number", "sensor", "input_number"])
-            ),
-            _opt_marker(CONF_TESLA_CHARGE_SWITCH, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
-            ),
-            _opt_marker(CONF_TESLA_CURRENT_NUMBER, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["number", "input_number"])
-            ),
-            _opt_marker(CONF_EVSE_POWER_SWITCH, defaults): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["switch", "input_boolean"])
-            ),
+            _opt_marker(CONF_EV_PLUGGED_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_EV_SOC_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_EV_TARGET_SOC_ENTITY, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_TESLA_CHARGE_SWITCH, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_TESLA_CURRENT_NUMBER, defaults): selector.EntitySelector(),
+            _opt_marker(CONF_EVSE_POWER_SWITCH, defaults): selector.EntitySelector(),
             vol.Required(
                 CONF_EV_MIN_CURRENT,
                 default=int(defaults.get(CONF_EV_MIN_CURRENT, DEFAULT_EV_MIN_CURRENT)),
