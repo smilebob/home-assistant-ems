@@ -13,9 +13,11 @@ import {
   Info,
   RefreshCw,
   Power,
+  Settings,
 } from 'lucide-react'
 import PowerFlow from './components/PowerFlow.jsx'
 import SolcastMLChart from './components/SolcastMLChart.jsx'
+import SettingsView from './components/SettingsView.jsx'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview')
@@ -161,12 +163,13 @@ export default function App() {
       </header>
 
       {/* Tabs Navigation */}
-      <nav className="border-b border-slate-800/80 bg-slate-900/30 px-6 flex space-x-1">
+      <nav className="border-b border-slate-800/80 bg-slate-900/30 px-6 flex space-x-1 overflow-x-auto">
         {[
           { id: 'overview', label: 'Pilotage & Flux', icon: Zap },
           { id: 'ml', label: 'Solcast & Machine Learning', icon: TrendingUp },
           { id: 'ecodan-ev', label: 'PAC Ecodan & Mobilité VE', icon: Flame },
           { id: 'decisions', label: 'Timeline des Décisions', icon: History },
+          { id: 'settings', label: 'Configuration & Entités HA', icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -487,11 +490,13 @@ export default function App() {
             </div>
           </div>
         )}
+        {/* Tab 5: Settings & HA Entity Remapping */}
+        {activeTab === 'settings' && <SettingsView />}
       </main>
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 px-6 py-4 text-center text-xs text-slate-500">
-        Smart Residential EMS Container • Exécution asynchrone découplée • DuckDB & Apache ECharts
+        Smart Residential EMS Container • Exécution asynchrone découplée • SQLite WAL & Apache ECharts
       </footer>
     </div>
   )

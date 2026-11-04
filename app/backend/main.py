@@ -93,6 +93,40 @@ async def get_config() -> dict[str, Any]:
     return config.dict()
 
 
+@app.post("/api/config")
+async def update_config(updates: dict[str, Any]) -> dict[str, Any]:
+    """Dynamically update EMS configuration, reload runtime parameters, and persist to options.json."""
+    for key, val in updates.items():
+        if hasattr(config, key):
+            setattr(config, key, val)
+
+    # Propagate immediate runtime flags to arbitrator
+    if "auto_mode" in updates:
+        engine.arbitrator.auto_mode_enabled = bool(updates["auto_mode"])
+    if "force_dhw_boost" in updates:
+        engine.arbitrator.force_dhw_boost = bool(updates["force_dhw_boost"])
+    if "force_tesla_charge" in updates:
+        engine.arbitrator.force_tesla_charge = bool(updates["force_tesla_charge"])
+    if "allow_thermal_overheat" in updates:
+        engine.arbitrator.allow_thermal_overheat = bool(updates["allow_thermal_overheat"])
+
+    # Persist to /data/options.json (HA Add-on) or ./config.json (Standalone Docker)
+    options_file = "/data/options.json" if os.path.exists("/data") else "config.json"
+    try:
+        current_data = {}
+        if os.path.exists(options_file):
+            with open(options_file, "r", encoding="utf-8") as f:
+                current_data = json.load(f)
+        current_data.update(updates)
+        with open(options_file, "w", encoding="utf-8") as f:
+            json.dump(current_data, f, indent=2)
+        _LOGGER.info("Configuration updated and saved to %s", options_file)
+    except Exception as err:
+        _LOGGER.warning("Could not persist updated options to %s: %s", options_file, err)
+
+    return {"status": "ok", "config": config.dict()}
+
+
 @app.post("/api/action")
 async def perform_action(payload: dict[str, Any]) -> dict[str, Any]:
     """Trigger manual override actions (e.g. force DHW boost, force Tesla charge, toggle auto mode)."""

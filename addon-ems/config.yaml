@@ -1,5 +1,5 @@
 name: "Smart Residential EMS (Dashboard & Arbitrage)"
-version: "2.0.3"
+version: "2.0.4"
 slug: "smart_residential_ems"
 description: "Application conteneurisée portable de pilotage solaire intelligent avec interface Web Ingress en barre latérale."
 url: "https://github.com/smilebob/home-assistant-ems"
@@ -19,6 +19,7 @@ options:
   mqtt_enabled: false
   mqtt_host: "core-mosquitto"
   mqtt_port: 1883
+  # Paramètres d'arbitrage
   battery_capacity_kwh: 15.0
   battery_min_soc: 15.0
   battery_target_soc_ev: 80.0
@@ -31,6 +32,38 @@ options:
   tariff_mode: "fixed"
   grid_import_price_fixed: 0.1689
   grid_export_price_fixed: 0.0400
+  grid_import_price_entity: "sensor.electricity_market_price"
+  # Mappings Entités Solaire & Batterie
+  pv_power_entity: "sensor.felicity_inverter_total_pv_power"
+  grid_power_entity: "sensor.felicity_inverter_total_ac_input_power"
+  house_load_entity: "sensor.felicity_inverter_loadpower_lineside"
+  battery_soc_entity: "sensor.felicity_inverter_battery_capacity"
+  battery_power_entity: "sensor.felicity_inverter_battery_power"
+  felicity_work_mode_entity: "select.felicity_inverter_operating_mode"
+  felicity_force_charge_entity: "select.felicity_inverter_economic_mode_rule_1_enable"
+  # Mappings Entités Pompe à Chaleur Ecodan
+  dhw_temp_entity: "sensor.ecodan_heatpump_temp_actuelle_ecs"
+  dhw_target_entity: "climate.ecodan_heatpump_thermostat_ecs"
+  dhw_force_entity: "switch.ecodan_heatpump_forcer_ecs"
+  z1_temp_entity: "sensor.ecodan_heatpump_z1_temp_pi_ce"
+  z1_target_entity: "climate.ecodan_heatpump_zone_1_temp_ambiante"
+  z2_temp_entity: "sensor.ecodan_heatpump_z2_temp_pi_ce"
+  z2_target_entity: "climate.ecodan_heatpump_zone_2_temp_ambiante"
+  outdoor_temp_entity: "sensor.ecodan_heatpump_temp_ext"
+  # Mappings Entités Véhicule & Borne
+  ev_plugged_entity: "binary_sensor.sally_charge_cable"
+  ev_soc_entity: "sensor.sally_battery"
+  ev_target_soc_entity: "number.sally_charge_limit"
+  tesla_charge_switch: "switch.sally_charge"
+  tesla_current_number: "number.sally_charging_amps"
+  evse_power_switch: "select.garage_borne_voiture_toggle_charging"
+  evse_current_number: "number.garage_borne_voiture_set_charge_current"
+  evse_power_entity: "sensor.garage_borne_voiture_charging_power"
+  # Mappings Entités Prévision Solaire (Solcast)
+  solar_forecast_power_now: "sensor.solcast_pv_forecast_forecast_power"
+  solar_forecast_today_remaining: "sensor.solcast_pv_forecast_forecast_today"
+  solar_forecast_tomorrow: "sensor.solcast_pv_forecast_forecast_tomorrow"
+  solar_forecast_day_after: "sensor.solcast_pv_forecast_forecast_day_3"
 schema:
   ha_url: str
   ha_token: password?
@@ -51,3 +84,31 @@ schema:
   tariff_mode: list(fixed|time_of_use|dynamic)
   grid_import_price_fixed: float
   grid_export_price_fixed: float
+  grid_import_price_entity: str?
+  pv_power_entity: str?
+  grid_power_entity: str?
+  house_load_entity: str?
+  battery_soc_entity: str?
+  battery_power_entity: str?
+  felicity_work_mode_entity: str?
+  felicity_force_charge_entity: str?
+  dhw_temp_entity: str?
+  dhw_target_entity: str?
+  dhw_force_entity: str?
+  z1_temp_entity: str?
+  z1_target_entity: str?
+  z2_temp_entity: str?
+  z2_target_entity: str?
+  outdoor_temp_entity: str?
+  ev_plugged_entity: str?
+  ev_soc_entity: str?
+  ev_target_soc_entity: str?
+  tesla_charge_switch: str?
+  tesla_current_number: str?
+  evse_power_switch: str?
+  evse_current_number: str?
+  evse_power_entity: str?
+  solar_forecast_power_now: str?
+  solar_forecast_today_remaining: str?
+  solar_forecast_tomorrow: str?
+  solar_forecast_day_after: str?

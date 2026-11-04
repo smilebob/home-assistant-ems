@@ -1,0 +1,55 @@
+configuration:
+  ha_url:
+    name: "URL de Home Assistant"
+    description: "URL interne ou externe de Home Assistant (par défaut: http://supervisor/core)"
+  ha_token:
+    name: "Jeton d'accès Home Assistant (Optionnel)"
+    description: "Laisser vide si l'Add-on utilise le jeton de sécurité automatique du Supervisor."
+  pv_power_entity:
+    name: "Capteur Puissance PV (W)"
+    description: "Entité sensor mesurant la production solaire actuelle."
+  grid_power_entity:
+    name: "Capteur Puissance Réseau (W)"
+    description: "Entité sensor mesurant la puissance importée (+) ou exportée (-)."
+  house_load_entity:
+    name: "Capteur Consommation Maison (W)"
+    description: "Entité sensor mesurant la charge électrique du foyer."
+  battery_soc_entity:
+    name: "Capteur SoC Batterie (%)"
+    description: "Entité sensor indiquant le pourcentage de batterie restante."
+  battery_power_entity:
+    name: "Capteur Puissance Batterie (W)"
+    description: "Entité sensor mesurant la charge (+) ou décharge (-) de la batterie."
+  dhw_temp_entity:
+    name: "Capteur Température ECS (°C)"
+    description: "Entité de mesure de la température actuelle du ballon d'eau chaude."
+  dhw_target_entity:
+    name: "Consigne Thermostat ECS"
+    description: "Entité climate du ballon thermodynamique Ecodan."
+  dhw_force_entity:
+    name: "Interrupteur Forçage ECS"
+    description: "Entité switch pour forcer la chauffe ECS lors d'un surplus solaire."
+  z1_temp_entity:
+    name: "Température Zone 1 Chauffage (°C)"
+    description: "Entité sensor de température ambiante zone 1."
+  z2_temp_entity:
+    name: "Température Zone 2 Chauffage (°C)"
+    description: "Entité sensor de température ambiante zone 2 (bureau/grenier)."
+  outdoor_temp_entity:
+    name: "Température Extérieure (°C)"
+    description: "Entité sensor météo/sonde extérieure pour le modèle ML."
+  ev_soc_entity:
+    name: "Capteur SoC Véhicule (%)"
+    description: "Entité sensor indiquant la batterie de la voiture (Tesla)."
+  ev_target_soc_entity:
+    name: "Consigne Limite Charge Véhicule (%)"
+    description: "Entité number définissant la limite de charge (ex: 80%)."
+  tesla_charge_switch:
+    name: "Interrupteur Charge Tesla"
+    description: "Entité switch démarrant/stoppant la charge Tesla Fleet."
+  tesla_current_number:
+    name: "Courant Charge Tesla (A)"
+    description: "Entité number pilotant l'ampérage dynamique (1A à 16A/32A)."
+  solar_forecast_power_now:
+    name: "Prévision Puissance Solaire Instantanée"
+    description: "Entité Solcast (W) pour la puissance solaire prévue."
