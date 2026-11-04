@@ -69,11 +69,19 @@ class EcodanController:
 
         in_window = self.is_in_dhw_solar_window(now)
         need_daily_dhw = in_window and (dhw_temp < normal_temp - 3.0) and (net_surplus_watts > 600.0 or now.hour >= 13)
-        emergency_dhw = dhw_temp < 38.0
-        do_boost = force_boost_requested or (thermal_storage_priority and dhw_temp < boost_temp - 1.5)
+        do_boost = force_boost_requested or (in_window and thermal_storage_priority and dhw_temp < boost_temp - 1.5)
 
-        target_temp = boost_temp if do_boost else normal_temp
-        should_heat = emergency_dhw or need_daily_dhw or do_boost
+        if do_boost:
+            target_temp = boost_temp
+        elif in_window:
+            target_temp = normal_temp
+        else:
+            # Outside solar window (e.g. 16h-11h): lower DHW setpoint to minimum (40.0°C)
+            # so Ecodan's internal thermostat (with 10°C drop -> 30°C threshold)
+            # and the EMS never trigger DHW after morning showers before 11h00.
+            target_temp = 40.0
+
+        should_heat = need_daily_dhw or do_boost
 
         if dhw_target_entity:
             domain = dhw_target_entity.split(".")[0]
