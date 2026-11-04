@@ -418,6 +418,26 @@ class EMSDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not domain or not service or not entity_id:
             return
 
+        # Avoid spamming bus (CN105 / Modbus) if entity is already at the desired state/setpoint
+        st = self.hass.states.get(entity_id)
+        if st is not None and not cmd.get("wait_for_entity"):
+            if domain in ("climate", "water_heater") and service == "set_temperature":
+                curr_target = st.attributes.get("temperature")
+                desired_target = data.get("temperature")
+                if curr_target is not None and desired_target is not None:
+                    try:
+                        if abs(float(curr_target) - float(desired_target)) < 0.1:
+                            return
+                    except (ValueError, TypeError):
+                        pass
+            elif domain == "select" and service == "select_option":
+                if st.state == data.get("option"):
+                    return
+            elif domain == "switch" and service in ("turn_on", "turn_off"):
+                desired_state = "on" if service == "turn_on" else "off"
+                if st.state == desired_state:
+                    return
+
         # If this command (e.g. Borne IRVE) requires confirmation from the vehicle first, wait for it
         wait_entity = cmd.get("wait_for_entity")
         wait_val = cmd.get("wait_for_value")
