@@ -1,10 +1,13 @@
 # 🧠 Mémoire Globale du Projet : Smart Residential EMS (`home-assistant-ems`)
 
-> **Dernière MAJ** : 2026-11-03 | **Statut** : Déployé en Production (V1.1.1)
+> **Dernière MAJ** : 2026-11-04 | **Statut** : Déployé en Production (V1.1.3) & Application Docker / Add-on Ingress v2.0 initiée
 
 ## 🎯 Vue d'Ensemble & Objectif
-- **Description** : Intégration HACS native pour Home Assistant optimisant l'autoconsommation d'une installation photovoltaïque (7 kWc) + batterie 15 kWh (`ha_felicity`), d'une PAC air-eau Mitsubishi Ecodan bi-zone + ECS (`esphome-ecodan-hp`), et d'une recharge véhicule électrique (`teslafleet` + borne `local_tuya`), pilotée par prévisions Solcast (J+0 à J+2) et Machine Learning local (entraîné sur 2 ans d'historique Recorder).
-- **Stack Technique** : Python 3.11+, Home Assistant Custom Component (`config_flow`, `DataUpdateCoordinator`), Machine Learning (`scikit-learn` `RandomForestRegressor` + fallback natif pur Python), Web Component Lovelace (`ems-card.js`).
+- **Description** : Double solution d'arbitrage solaire résidentiel optimisant l'autoconsommation d'une installation photovoltaïque (7 kWc) + batterie 15 kWh (`ha_felicity`), d'une PAC air-eau Mitsubishi Ecodan bi-zone + ECS (`esphome-ecodan-hp`), et d'une recharge véhicule électrique (`teslafleet` + borne `local_tuya`), pilotée par prévisions Solcast (J+0 à J+2) et Machine Learning local.
+- **Deux Modes d'Exécution Disponibles** :
+  1. **Intégration HACS native** : Composant léger [`custom_components/ems/`](file:///home/pierre/Projets/ems/custom_components/ems/) (V1.1.3 en production).
+  2. **Application Conteneurisée Découplée (Docker & Add-on HA Ingress)** : [`app/`](file:///home/pierre/Projets/ems/app/) avec backend FastAPI, WebSockets natifs, stockage DuckDB local, passerelle MQTT universelle, et interface Web React 18 + Tailwind + Apache ECharts intégrée à la barre latérale.
+- **Stack Technique** : Python 3.12+, FastAPI, WebSockets, DuckDB, `scikit-learn`, React 18, Vite, Apache ECharts, Tailwind CSS, Home Assistant Ingress.
 - **Point d'Entrée Global** : [`custom_components/ems/__init__.py`](file:///home/pierre/Projets/ems/custom_components/ems/__init__.py)
 
 ## 🚀 Commandes Essentielles
