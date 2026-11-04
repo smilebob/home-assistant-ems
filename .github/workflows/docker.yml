@@ -7,6 +7,7 @@ on:
     paths:
       - 'app/**'
       - 'custom_components/**'
+      - 'addon-ems/**'
       - 'docker-compose.yml'
       - '.github/workflows/docker.yml'
   release:
@@ -23,6 +24,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Read Add-on version
+        id: addon_version
+        run: |
+          VERSION=$(grep '^version:' addon-ems/config.yaml | awk '{print $2}' | tr -d '"')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -44,9 +52,8 @@ jobs:
           images: ghcr.io/smilebob/home-assistant-ems
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=2.0.2
-            type=raw,value=2.0.1
-            type=raw,value=2.0.0
+            type=raw,value=${{ steps.addon_version.outputs.version }}
+            type=raw,value=2.0.3
             type=semver,pattern={{version}}
 
       - name: Build and push multi-arch Docker image
