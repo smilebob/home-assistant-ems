@@ -31,18 +31,27 @@
 
 ---
 
-## 🚀 1. Installation & Reconfiguration
+## 🚀 1. Déploiement & Installation
 
-### Via HACS (Recommandé)
+Smart Residential EMS est disponible sous deux formats selon vos préférences :
+
+### Option A : Module Complémentaire Home Assistant avec Ingress (Recommandé)
+Fonctionne de façon totalement autonome et découplée dans son conteneur Docker optimisé, avec tableau de bord temps réel plein écran accessible dans la barre latérale :
+1. Dans Home Assistant, allez dans **Paramètres $\rightarrow$ Modules complémentaires $\rightarrow$ Boutique des modules complémentaires**.
+2. Cliquez sur les **3 petits points verticaux** (en haut à droite) $\rightarrow$ **Dépôts**.
+3. Ajoutez l'URL de votre dépôt : `https://github.com/smilebob/home-assistant-ems`.
+4. Sélectionnez **Smart Residential EMS (Dashboard & Arbitrage)** puis cliquez sur **Installer**.
+5. Démarrez le module et accédez au tableau de bord complet (Flux SVG, courbes ECharts, PAC Ecodan, Tesla, historique et remapping d'entités).
+
+### Option B : Intégration Native HACS
 1. Ouvrez **HACS $\rightarrow$ Intégrations $\rightarrow$ Menu (⋮) $\rightarrow$ Dépôts personnalisés**.
 2. Ajoutez l'URL `https://github.com/smilebob/home-assistant-ems` dans la catégorie **Intégration**.
 3. Installez **Smart Residential EMS (Ecodan / Felicity / Tesla)** puis redémarrez Home Assistant.
 4. Allez dans **Paramètres $\rightarrow$ Appareils et services $\rightarrow$ Ajouter une intégration** et recherchez **Smart Residential EMS**.
 
 ### Modification de la configuration à tout moment
-Toutes les entités et tous les seuils peuvent être modifiés à chaud sans jamais supprimer l'intégration :
-- Soit via **Paramètres $\rightarrow$ Appareils et services $\rightarrow$ Smart Residential EMS $\rightarrow$ Configurer** (menu par onglets thématiques ou assistant complet).
-- Soit via le menu **⋮ $\rightarrow$ Reconfigurer**.
+- **Via l'Add-on Ingress** : Onglet *« Configuration & Entités HA »* directement dans le dashboard Ingress ou onglet *Configuration* de l'Add-on.
+- **Via l'intégration HACS** : **Paramètres $\rightarrow$ Appareils et services $\rightarrow$ Smart Residential EMS $\rightarrow$ Configurer** (menu par onglets thématiques ou assistant complet).
 - Toutes vos entités déjà sélectionnées sont automatiquement pré-remplies.
 
 ---
