@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  ems:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: smart-residential-ems
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - HA_URL=https://ha.smilebob.fr
+      - HA_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiODNiMjllZGU1OGI0N2MxOWY0NzM5MGUwMGUzNzYwNiIsImlhdCI6MTc5MzczNzAyMywiZXhwIjoyMTA5MDk3MDIzfQ.5T_BrpQORp0JqGEkSHKvwWey5dW5RzOMf29tIS8Ks9c
+      - PORT=8080
+    volumes:
+      - ems-data:/data
+
+volumes:
+  ems-data:
+    driver: local

@@ -1,0 +1,53 @@
+name: "Smart Residential EMS (Dashboard & Arbitrage)"
+version: "2.0.0"
+slug: "smart_residential_ems"
+description: "Application conteneurisée portable de pilotage solaire intelligent avec interface Web Ingress en barre latérale."
+url: "https://github.com/smilebob/home-assistant-ems"
+image: "ghcr.io/smilebob/home-assistant-ems/{arch}"
+arch:
+  - aarch64
+  - amd64
+startup: services
+boot: auto
+ingress: true
+ingress_port: 8080
+panel_icon: "mdi:solar-power-variant"
+panel_title: "Smart EMS"
+homeassistant_api: true
+options:
+  ha_url: "http://supervisor/core"
+  mqtt_enabled: false
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  battery_capacity_kwh: 15.0
+  battery_min_soc: 15.0
+  battery_target_soc_ev: 80.0
+  battery_thermal_soc_threshold: 95.0
+  dhw_normal_temp: 50.0
+  dhw_boost_temp: 55.0
+  dhw_solar_window_start: 11
+  dhw_solar_window_end: 16
+  z2_max_overheat_offset: 1.0
+  tariff_mode: "fixed"
+  grid_import_price_fixed: 0.1689
+  grid_export_price_fixed: 0.0400
+schema:
+  ha_url: str
+  ha_token: password?
+  mqtt_enabled: bool
+  mqtt_host: str?
+  mqtt_port: port?
+  mqtt_username: str?
+  mqtt_password: password?
+  battery_capacity_kwh: float
+  battery_min_soc: float
+  battery_target_soc_ev: float
+  battery_thermal_soc_threshold: float
+  dhw_normal_temp: float
+  dhw_boost_temp: float
+  dhw_solar_window_start: int
+  dhw_solar_window_end: int
+  z2_max_overheat_offset: float
+  tariff_mode: list(fixed|time_of_use|dynamic)
+  grid_import_price_fixed: float
+  grid_export_price_fixed: float
