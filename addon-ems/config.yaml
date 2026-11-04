@@ -3,7 +3,7 @@ version: "2.0.0"
 slug: "smart_residential_ems"
 description: "Application conteneurisée portable de pilotage solaire intelligent avec interface Web Ingress en barre latérale."
 url: "https://github.com/smilebob/home-assistant-ems"
-image: "ghcr.io/smilebob/home-assistant-ems/{arch}"
+image: "ghcr.io/smilebob/home-assistant-ems"
 arch:
   - aarch64
   - amd64
