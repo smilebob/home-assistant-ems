@@ -77,8 +77,14 @@ async def get_state() -> dict[str, Any]:
 
 @app.get("/api/history")
 async def get_history(hours: int = 24) -> list[dict[str, Any]]:
-    """Return recent telemetry from DuckDB for time-series charts."""
+    """Return recent telemetry from SQLite for time-series charts."""
     return storage.get_recent_telemetry(hours=hours)
+
+
+@app.get("/api/history/daily-solar")
+async def get_daily_solar(days: int = 7) -> list[dict[str, Any]]:
+    """Return aggregated daily solar energy (kWh): Solcast predicted vs Actual production."""
+    return storage.get_daily_solar_comparison(days=days)
 
 
 @app.get("/api/decisions")

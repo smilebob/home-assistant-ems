@@ -1,5 +1,5 @@
 name: "Smart Residential EMS (Dashboard & Arbitrage)"
-version: "2.0.4"
+version: "2.0.5"
 slug: "smart_residential_ems"
 description: "Application conteneurisée portable de pilotage solaire intelligent avec interface Web Ingress en barre latérale."
 url: "https://github.com/smilebob/home-assistant-ems"

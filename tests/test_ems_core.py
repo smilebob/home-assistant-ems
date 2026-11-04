@@ -450,13 +450,22 @@ class TestSmartResidentialEMS(unittest.TestCase):
                 "battery_power_w": 2500.0,
                 "active_priority": "battery_first",
                 "instant_savings_eur_h": 1.05,
+                "solcast_power_w": 4050.0,
+                "predicted_load_w": 1650.0,
             })
             storage.record_decision("battery_first", "Surplus solaire dirigé vers la batterie Felicity")
 
             telemetry = storage.get_recent_telemetry(hours=1)
             self.assertEqual(len(telemetry), 1)
             self.assertEqual(telemetry[0]["pv_power_w"], 4200.0)
+            self.assertEqual(telemetry[0]["solcast_power_w"], 4050.0)
+            self.assertEqual(telemetry[0]["predicted_load_w"], 1650.0)
             self.assertEqual(telemetry[0]["active_priority"], "battery_first")
+
+            daily = storage.get_daily_solar_comparison(days=7)
+            self.assertEqual(len(daily), 1)
+            self.assertIn("actual_kwh", daily[0])
+            self.assertIn("predicted_kwh", daily[0])
 
             decisions = storage.get_recent_decisions(limit=10)
             self.assertEqual(len(decisions), 1)

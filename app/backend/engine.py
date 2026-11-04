@@ -202,6 +202,10 @@ class EMSEngine:
             z1_rooms_readings=room_readings,
         )
 
+        # Current instant prediction for storage telemetry and real-time validation
+        instant_pred_load = self.ml_model.predict_power_watts(now, outdoor_temp, z1_temp, z2_temp)
+        calibrated_solcast_power = round(solcast_power * self.solar_calibrator.global_ratio, 1)
+
         # Accumulate financial savings
         step_hours = 30.0 / 3600.0
         self.cumulative_savings_eur = round(
@@ -210,8 +214,16 @@ class EMSEngine:
         result["cumulative_savings_eur"] = self.cumulative_savings_eur
         result["hourly_forecast"] = hourly_forecast[:12]
         result["solar_calibration_ratio"] = self.solar_calibrator.global_ratio
+        result["solcast_power_w"] = calibrated_solcast_power
+        result["raw_solcast_power_w"] = solcast_power
+        result["predicted_load_w"] = round(instant_pred_load, 1)
 
-        # 2. Persist to DuckDB
+        # Continuous online learning and calibration
+        self.solar_calibrator.record_observation(now, solcast_power, pv_power, outdoor_temp)
+        self.storage.record_solar_observation(now, solcast_power, pv_power, outdoor_temp)
+        self.ml_model.record_observation(now, house_load, outdoor_temp, z1_temp)
+
+        # 2. Persist to SQLite
         self.storage.record_telemetry(result)
         if result.get("active_priority") != self.latest_result.get("active_priority"):
             self.storage.record_decision(result["active_priority"], result.get("decision_reason", ""))

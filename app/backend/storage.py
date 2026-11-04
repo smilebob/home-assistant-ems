@@ -50,9 +50,18 @@ class EMSStorage:
                     ev_soc REAL,
                     ev_amps INTEGER,
                     active_priority TEXT,
-                    instant_savings_eur_h REAL
+                    instant_savings_eur_h REAL,
+                    solcast_power_w REAL DEFAULT 0.0,
+                    predicted_load_w REAL DEFAULT 0.0
                 );
             """)
+
+            # Gracefully ensure new columns exist for existing databases
+            for col in ["solcast_power_w", "predicted_load_w"]:
+                try:
+                    con.execute(f"ALTER TABLE telemetry ADD COLUMN {col} REAL DEFAULT 0.0;")
+                except Exception:
+                    pass
 
             con.execute("""
                 CREATE TABLE IF NOT EXISTS decision_log (
@@ -84,8 +93,13 @@ class EMSStorage:
         try:
             with self._get_connection() as con:
                 con.execute("""
-                    INSERT OR REPLACE INTO telemetry VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    INSERT OR REPLACE INTO telemetry (
+                        timestamp, pv_power_w, grid_power_w, house_load_w,
+                        battery_soc, battery_power_w, dhw_temp, z1_temp, z2_temp,
+                        outdoor_temp, ev_soc, ev_amps, active_priority, instant_savings_eur_h,
+                        solcast_power_w, predicted_load_w
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                 """, [
                     ts_str,
@@ -102,10 +116,31 @@ class EMSStorage:
                     int(data.get("ev_target_amps") or 0),
                     str(data.get("active_priority") or "idle"),
                     float(data.get("instant_savings_eur_h") or 0.0),
+                    float(data.get("solcast_power_w") or 0.0),
+                    float(data.get("predicted_load_w") or 0.0),
                 ])
                 con.commit()
         except Exception as err:
             _LOGGER.error("Failed to write telemetry to SQLite: %s", err)
+
+    def record_solar_observation(
+        self,
+        timestamp: datetime,
+        solcast_watts: float,
+        actual_pv_watts: float,
+        outdoor_temp: float = 15.0,
+    ) -> None:
+        """Persist real-time comparison point between Solcast and actual inverter output."""
+        try:
+            with self._get_connection() as con:
+                con.execute("""
+                    INSERT OR REPLACE INTO solar_observations (
+                        timestamp, solcast_watts, actual_pv_watts, outdoor_temp
+                    ) VALUES (?, ?, ?, ?)
+                """, [timestamp.isoformat(), float(solcast_watts), float(actual_pv_watts), float(outdoor_temp)])
+                con.commit()
+        except Exception as err:
+            _LOGGER.error("Failed to write solar observation: %s", err)
 
     def record_decision(self, priority: str, reason: str, ts: datetime | None = None) -> None:
         """Log an arbitration priority change with French explanation."""
@@ -139,7 +174,9 @@ class EMSStorage:
                         outdoor_temp,
                         ev_soc,
                         ev_amps,
-                        active_priority
+                        active_priority,
+                        solcast_power_w,
+                        predicted_load_w
                     FROM telemetry
                     WHERE timestamp >= ?
                     ORDER BY timestamp ASC
@@ -148,6 +185,40 @@ class EMSStorage:
         except Exception as err:
             _LOGGER.error("Failed to read telemetry from SQLite: %s", err)
             return []
+
+    def get_daily_solar_comparison(self, days: int = 7) -> list[dict[str, Any]]:
+        """Compute aggregated daily solar energy (kWh): Solcast predicted vs Actual inverter production."""
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00")
+        results: list[dict[str, Any]] = []
+        try:
+            with self._get_connection() as con:
+                # Integrate average power per hour to obtain daily kWh
+                cur = con.execute("""
+                    SELECT 
+                        date(timestamp) as day,
+                        round(sum(pv_power_w) / count(*) * 24.0 / 1000.0, 2) as actual_kwh,
+                        round(sum(solcast_power_w) / count(*) * 24.0 / 1000.0, 2) as predicted_kwh
+                    FROM telemetry
+                    WHERE timestamp >= ?
+                    GROUP BY date(timestamp)
+                    ORDER BY day ASC
+                """, [cutoff])
+                rows = [dict(r) for r in cur.fetchall()]
+                for r in rows:
+                    act = float(r.get("actual_kwh") or 0.0)
+                    pred = float(r.get("predicted_kwh") or 0.0)
+                    ratio = round((act / pred * 100.0), 1) if pred > 0.5 else 100.0
+                    results.append({
+                        "date": r["day"],
+                        "actual_kwh": act,
+                        "predicted_kwh": pred,
+                        "accuracy_pct": ratio,
+                        "delta_kwh": round(act - pred, 2)
+                    })
+        except Exception as err:
+            _LOGGER.error("Failed to compute daily solar comparison: %s", err)
+
+        return results
 
     def get_recent_decisions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Retrieve latest decision explanations."""
