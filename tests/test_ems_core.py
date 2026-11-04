@@ -406,6 +406,37 @@ class TestSmartResidentialEMS(unittest.TestCase):
         self.assertIn("Ouvrir", valves[1]["action"])
         self.assertEqual(valves[2]["direction"], "ok")
 
+        # Verify strict DHW solar window lock (no morning trigger at 08:20 even at 36°C)
+        ecodan_dhw = EcodanController(
+            {
+                CONF_DHW_TARGET_ENTITY: "climate.ecodan_heatpump_thermostat_ecs",
+                CONF_DHW_FORCE_ENTITY: "switch.ecodan_heatpump_forcer_ecs",
+                "dhw_normal_temp": 50.0,
+                "dhw_boost_temp": 55.0,
+                "dhw_solar_window_start": 11,
+                "dhw_solar_window_end": 16,
+            }
+        )
+        morning_8h20 = datetime(2026, 11, 5, 8, 20)
+        heat_morning, target_morning, cmds_morning = ecodan_dhw.evaluate_dhw_need(
+            now=morning_8h20,
+            dhw_temp=36.0,
+            net_surplus_watts=1000.0,
+        )
+        self.assertFalse(heat_morning)
+        self.assertEqual(target_morning, 40.0)
+        self.assertFalse(any(c["entity_id"] == "switch.ecodan_heatpump_forcer_ecs" for c in cmds_morning))
+
+        solar_11h30 = datetime(2026, 11, 5, 11, 30)
+        heat_noon, target_noon, cmds_noon = ecodan_dhw.evaluate_dhw_need(
+            now=solar_11h30,
+            dhw_temp=36.0,
+            net_surplus_watts=1000.0,
+        )
+        self.assertTrue(heat_noon)
+        self.assertEqual(target_noon, 50.0)
+        self.assertTrue(any(c["entity_id"] == "switch.ecodan_heatpump_forcer_ecs" for c in cmds_noon))
+
 
 if __name__ == "__main__":
     unittest.main()
