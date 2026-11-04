@@ -22,7 +22,8 @@ try:
     from sklearn.ensemble import RandomForestRegressor
 
     HAS_SKLEARN = True
-except ImportError:
+except (ImportError, RuntimeError, Exception) as err:
+    _LOGGER.info("Scikit-learn/NumPy binary acceleration unavailable (%s), using pure Python ensemble fallback", err)
     HAS_SKLEARN = False
 
 
