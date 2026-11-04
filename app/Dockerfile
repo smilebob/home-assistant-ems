@@ -8,7 +8,7 @@ RUN npm install
 COPY app/frontend/ ./
 RUN npm run build
 
-# Stage 2: Production Python Image (FastAPI + DuckDB + Scikit-Learn)
+# Stage 2: Production Python Image (FastAPI + SQLite + Native Ensemble ML)
 FROM python:3.12-slim
 WORKDIR /app
 
@@ -29,6 +29,8 @@ COPY --from=frontend-builder /build/dist /app/app/frontend/dist
 
 ENV PYTHONPATH=/app
 ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+ENV EMS_DISABLE_NUMPY=1
 EXPOSE 8080
 
 CMD ["python", "-m", "app.backend.main"]

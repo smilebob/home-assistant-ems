@@ -17,14 +17,16 @@ _LOGGER = logging.getLogger(__name__)
 EXPECTED_LOAD_FEATURES = 13
 EXPECTED_SOLAR_FEATURES = 8
 
-try:
-    import numpy as np
-    from sklearn.ensemble import RandomForestRegressor
+HAS_SKLEARN = False
+if os.environ.get("EMS_DISABLE_NUMPY") != "1":
+    try:
+        import numpy as np
+        from sklearn.ensemble import RandomForestRegressor
 
-    HAS_SKLEARN = True
-except (ImportError, RuntimeError, Exception) as err:
-    _LOGGER.info("Scikit-learn/NumPy binary acceleration unavailable (%s), using pure Python ensemble fallback", err)
-    HAS_SKLEARN = False
+        HAS_SKLEARN = True
+    except (ImportError, RuntimeError, Exception) as err:
+        _LOGGER.info("Scikit-learn/NumPy binary acceleration unavailable (%s), using pure Python ensemble fallback", err)
+        HAS_SKLEARN = False
 
 
 class _NativeDecisionTree:
