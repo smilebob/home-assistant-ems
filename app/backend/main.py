@@ -99,6 +99,13 @@ async def get_config() -> dict[str, Any]:
     return config.dict()
 
 
+@app.post("/api/ml/retrain")
+async def trigger_ml_retrain() -> dict[str, Any]:
+    """Force manual retraining and reinforcement of ML models with latest observations."""
+    res = engine.retrain_models()
+    return {"status": "ok", "result": res}
+
+
 @app.post("/api/config")
 async def update_config(updates: dict[str, Any]) -> dict[str, Any]:
     """Dynamically update EMS configuration, reload runtime parameters, and persist to options.json."""

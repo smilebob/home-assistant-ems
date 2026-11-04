@@ -1,11 +1,32 @@
 import React, { useState, useEffect } from 'react'
 import ReactECharts from 'echarts-for-react'
-import { Sun, Zap, Calendar, TrendingUp, CheckCircle, BarChart3, Clock } from 'lucide-react'
+import { Sun, Zap, Calendar, TrendingUp, CheckCircle, BarChart3, Clock, RefreshCw, Cpu } from 'lucide-react'
 
 export default function SolcastMLChart({ state, history = [] }) {
   const [activeChart, setActiveChart] = useState('solar') // 'solar' | 'load'
   const [dailyData, setDailyData] = useState([])
   const [loadingDaily, setLoadingDaily] = useState(false)
+  const [retraining, setRetraining] = useState(false)
+  const [retrainMsg, setRetrainMsg] = useState(null)
+
+  const handleRetrain = async () => {
+    setRetraining(true)
+    setRetrainMsg(null)
+    try {
+      const res = await fetch('./api/ml/retrain', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setRetrainMsg({ type: 'success', text: 'Modèles ML et Solcast réentraînés avec succès !' })
+      } else {
+        setRetrainMsg({ type: 'error', text: 'Erreur lors du réentraînement.' })
+      }
+    } catch (e) {
+      setRetrainMsg({ type: 'error', text: `Erreur: ${e.message}` })
+    } finally {
+      setRetraining(false)
+      setTimeout(() => setRetrainMsg(null), 5000)
+    }
+  }
 
   const hourlyForecast = state?.hourly_forecast || []
   const ratio = state?.solar_calibration_ratio != null ? Number(state.solar_calibration_ratio).toFixed(3) : '1.000'
@@ -349,17 +370,39 @@ export default function SolcastMLChart({ state, history = [] }) {
         </div>
 
         {/* Métriques de précision */}
-        <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-800/80">
-          <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
-            Ratio Solcast actuel : <strong className="text-amber-400 font-mono">{ratio}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
-            Score R² ML : <strong className="text-emerald-400 font-mono">{r2}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
-            Erreur MAE ML : <strong className="text-sky-400 font-mono">{mae} W</strong>
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/80">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+              Ratio Solcast actuel : <strong className="text-amber-400 font-mono">{ratio}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+              Score R² ML : <strong className="text-emerald-400 font-mono">{r2}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+              Erreur MAE ML : <strong className="text-sky-400 font-mono">{mae} W</strong>
+            </span>
+          </div>
+
+          <button
+            onClick={handleRetrain}
+            disabled={retraining}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 text-xs font-medium text-slate-200 transition-all shadow"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${retraining ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
+            {retraining ? 'Réentraînement...' : 'Réentraîner maintenant'}
+          </button>
         </div>
+
+        {retrainMsg && (
+          <div className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+            retrainMsg.type === 'success' 
+              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300' 
+              : 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
+          }`}>
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{retrainMsg.text}</span>
+          </div>
+        )}
 
         {/* Graphique ECharts */}
         <div className="w-full h-[320px]">

@@ -16,6 +16,7 @@ if REPO_ROOT not in sys.path:
 
 from custom_components.ems.core.arbitrator import EnergyArbitrator
 from custom_components.ems.ml.model import ConsumptionMLModel, SolarCalibrationModel
+from custom_components.ems.ml.dataset_builder import build_feature_vector
 from .config import EMSConfig
 from .ha_client import HAClient
 from .mqtt_client import EMSMQTTClient
@@ -80,10 +81,63 @@ class EMSEngine:
             storage_path=os.path.join(config.data_dir, "solar_cal.pkl")
         )
 
+        self._bootstrap_models()
+        self._cycle_counter = 0
+
         self.latest_result: dict[str, Any] = {}
         self.cumulative_savings_eur: float = 0.0
         self._ws_broadcast_subscribers: list[Callable[[dict[str, Any]], None]] = []
         self._running = False
+
+    def _bootstrap_models(self) -> None:
+        """Load persisted models or initialize and train baseline prior models."""
+        loaded_ml = self.ml_model.load_from_disk()
+        loaded_solar = self.solar_calibrator.load_from_disk()
+        if not loaded_ml or not self.ml_model.is_trained:
+            _LOGGER.info("Bootstrapping baseline Consumption ML model...")
+            self.ml_model.train([], [])
+            self.ml_model.save_to_disk()
+        if not loaded_solar or not self.solar_calibrator.is_trained:
+            _LOGGER.info("Bootstrapping baseline Solar Calibration model...")
+            self.solar_calibrator.train([], [], [])
+            self.solar_calibrator.save_to_disk()
+
+    def retrain_models(self) -> dict[str, Any]:
+        """Automatically reinforce and retrain both ML models with accumulated telemetry."""
+        _LOGGER.info("Executing periodic automatic reinforcement of ML models...")
+        historical_rows = self.storage.get_hourly_training_dataset(days=30)
+        X_hist: list[list[float]] = []
+        y_hist: list[float] = []
+        for r in historical_rows:
+            dt_str = r.get("dt")
+            load = r.get("load_w")
+            out_t = r.get("outdoor_temp", 12.0)
+            z1_t = r.get("z1_temp", 20.0)
+            z2_t = r.get("z2_temp", 20.5)
+            if dt_str and load is not None and float(load) > 50.0:
+                try:
+                    dt = datetime.fromisoformat(dt_str)
+                    vec = build_feature_vector(dt, out_t, z1_t, z2_t)
+                    X_hist.append(vec)
+                    y_hist.append(float(load))
+                except Exception:
+                    pass
+
+        ml_res = self.ml_model.train(X_hist, y_hist)
+        self.ml_model.save_to_disk()
+
+        solar_res = self.solar_calibrator.train([], [], [])
+        self.solar_calibrator.save_to_disk()
+
+        _LOGGER.info(
+            "ML models successfully reinforced: ML accuracy=%.1f%% (R²=%.3f, MAE=%.1fW) | Solar ratio=%.3f (samples=%d)",
+            ml_res.get("accuracy_pct", 0.0),
+            ml_res.get("r2_score", 0.0),
+            ml_res.get("mae_watts", 0.0),
+            solar_res.get("global_ratio", 1.0),
+            solar_res.get("solar_samples", 0),
+        )
+        return {"ml": ml_res, "solar": solar_res}
 
     def subscribe_ws(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Subscribe a WebSocket client to real-time state broadcasts."""
@@ -254,12 +308,19 @@ class EMSEngine:
         return result
 
     async def run_loop(self) -> None:
-        """Main periodic optimization loop (every 30 seconds)."""
+        """Main periodic optimization loop (every 30 seconds) with continuous reinforcement learning."""
         self._running = True
         _LOGGER.info("EMS Engine loop started (interval: 30s)")
         while self._running:
             try:
                 await self.execute_arbitration_cycle()
+                self._cycle_counter += 1
+                # Automatic model reinforcement every 120 cycles (1 hour)
+                if self._cycle_counter % 120 == 0:
+                    try:
+                        self.retrain_models()
+                    except Exception as train_err:
+                        _LOGGER.warning("Automatic ML model retraining encountered an issue: %s", train_err)
             except Exception as err:
                 _LOGGER.error("Error in EMS arbitration loop: %s", err, exc_info=True)
             await asyncio.sleep(30)
