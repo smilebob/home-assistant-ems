@@ -1,13 +1,78 @@
 import React, { useState, useEffect } from 'react'
 import ReactECharts from 'echarts-for-react'
-import { Sun, Zap, Calendar, TrendingUp, CheckCircle, BarChart3, Clock, RefreshCw, Cpu } from 'lucide-react'
+import { Sun, Zap, Calendar, TrendingUp, CheckCircle, BarChart3, Clock, RefreshCw, Cpu, Layers } from 'lucide-react'
 
 export default function SolcastMLChart({ state, history = [] }) {
   const [activeChart, setActiveChart] = useState('solar') // 'solar' | 'load'
+  const [timeRange, setTimeRange] = useState('24h') // '1h' | '3h' | '6h' | '12h' | '24h' | '48h' | '7d' | 'today' | 'yesterday'
+  const [dynamicHistory, setDynamicHistory] = useState([])
   const [dailyData, setDailyData] = useState([])
-  const [loadingDaily, setLoadingDaily] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [retraining, setRetraining] = useState(false)
   const [retrainMsg, setRetrainMsg] = useState(null)
+
+  const hourlyForecast = state?.hourly_forecast || []
+  const ratio = state?.solar_calibration_ratio != null ? Number(state.solar_calibration_ratio).toFixed(3) : '1.000'
+  const r2 = state?.ml_r2_score != null ? Number(state.ml_r2_score).toFixed(3) : '0.766'
+  const mae = state?.ml_mae_watts != null ? Math.round(state.ml_mae_watts) : '389'
+
+  // Fetch telemetry history based on selected timeline range
+  useEffect(() => {
+    const fetchRangeHistory = async () => {
+      setLoadingHistory(true)
+      try {
+        let url = './api/history?'
+        if (timeRange === 'today') {
+          const todayStr = new Date().toISOString().split('T')[0]
+          url += `start_time=${todayStr}T00:00:00`
+        } else if (timeRange === 'yesterday') {
+          const yDate = new Date(Date.now() - 86400000)
+          const yStr = yDate.toISOString().split('T')[0]
+          url += `start_time=${yStr}T00:00:00&end_time=${yStr}T23:59:59`
+        } else {
+          const hoursMap = {
+            '1h': 1,
+            '3h': 3,
+            '6h': 6,
+            '12h': 12,
+            '24h': 24,
+            '48h': 48,
+            '7d': 168,
+          }
+          const h = hoursMap[timeRange] || 24
+          url += `hours=${h}`
+        }
+
+        const res = await fetch(url)
+        if (res.ok) {
+          const data = await res.json()
+          setDynamicHistory(data)
+        }
+      } catch (err) {
+        console.error('Error fetching range history:', err)
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+
+    fetchRangeHistory()
+  }, [timeRange, state?.timestamp])
+
+  // Fetch daily solar comparison from backend
+  useEffect(() => {
+    const fetchDaily = async () => {
+      try {
+        const res = await fetch('./api/history/daily-solar?days=7')
+        if (res.ok) {
+          const data = await res.json()
+          setDailyData(data)
+        }
+      } catch (err) {
+        console.error('Error fetching daily solar stats:', err)
+      }
+    }
+    fetchDaily()
+  }, [state?.timestamp])
 
   const handleRetrain = async () => {
     setRetraining(true)
@@ -28,36 +93,15 @@ export default function SolcastMLChart({ state, history = [] }) {
     }
   }
 
-  const hourlyForecast = state?.hourly_forecast || []
-  const ratio = state?.solar_calibration_ratio != null ? Number(state.solar_calibration_ratio).toFixed(3) : '1.000'
-  const r2 = state?.ml_r2_score != null ? Number(state.ml_r2_score).toFixed(3) : '0.766'
-  const mae = state?.ml_mae_watts != null ? Math.round(state.ml_mae_watts) : '389'
-
-  // Fetch daily solar comparison from backend
-  useEffect(() => {
-    const fetchDaily = async () => {
-      try {
-        setLoadingDaily(true)
-        const res = await fetch('./api/history/daily-solar?days=7')
-        if (res.ok) {
-          const data = await res.json()
-          setDailyData(data)
-        }
-      } catch (err) {
-        console.error('Error fetching daily solar stats:', err)
-      } finally {
-        setLoadingDaily(false)
-      }
-    }
-    fetchDaily()
-  }, [state?.timestamp])
-
-  // Process History for Curves (Actual vs Predicted)
-  const historyPoints = history.length > 0 ? history : []
+  // Choose between dynamically fetched history or initial parent history
+  const historyPoints = dynamicHistory.length > 0 ? dynamicHistory : (history.length > 0 ? history : [])
   
   // Format timestamps
   const historyLabels = historyPoints.map(p => {
     const d = new Date(p.timestamp)
+    if (timeRange === '7d' || timeRange === '48h') {
+      return `${d.getDate()}/${d.getMonth() + 1} ${d.getHours().toString().padStart(2, '0')}h`
+    }
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
   })
 
@@ -69,22 +113,24 @@ export default function SolcastMLChart({ state, history = [] }) {
   const actualLoadWatts = historyPoints.map(p => Math.round(p.house_load_w || 0))
   const predictedLoadWatts = historyPoints.map(p => Math.round(p.predicted_load_w || (p.house_load_w ? p.house_load_w * 0.98 : 0)))
 
-  // Append future predictions if available
-  const futureHours = hourlyForecast.map(h => {
+  // Future predictions for load if looking at recent window
+  const showForecast = (timeRange === '24h' || timeRange === '12h' || timeRange === 'today') && hourlyForecast.length > 0
+  const futureHours = showForecast ? hourlyForecast.map(h => {
     const d = new Date(h.datetime)
     return `${d.getHours()}h (prév)`
-  })
+  }) : []
+
   const combinedLabels = [...historyLabels, ...futureHours]
   const combinedPredictedLoad = [
     ...predictedLoadWatts,
-    ...hourlyForecast.map(h => Math.round(h.predicted_watts || 0))
+    ...(showForecast ? hourlyForecast.map(h => Math.round(h.predicted_watts || 0)) : [])
   ]
   const combinedActualLoad = [
     ...actualLoadWatts,
-    ...new Array(futureHours.length).fill(null)
+    ...(showForecast ? new Array(futureHours.length).fill(null) : [])
   ]
 
-  // Options ECharts pour Courbes Temporelles (Watts)
+  // Options ECharts pour Courbes Temporelles (Watts) avec fonctionnalités Grafana
   const timeSeriesOption = activeChart === 'solar' ? {
     backgroundColor: 'transparent',
     tooltip: {
@@ -94,16 +140,41 @@ export default function SolcastMLChart({ state, history = [] }) {
       textStyle: { color: '#f8fafc', fontSize: 12 },
       valueFormatter: (val) => val != null ? `${val} W` : '--',
     },
+    toolbox: {
+      show: true,
+      feature: {
+        dataZoom: { yAxisIndex: 'none', title: { zoom: 'Zoom zone', back: 'Zoom arrière' } },
+        restore: { title: 'Rétablir' },
+        saveAsImage: { title: 'Export PNG', name: `ems-solaire-${timeRange}` }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      top: 0,
+      right: '2%'
+    },
+    dataZoom: [
+      { type: 'inside', start: 0, end: 100 },
+      {
+        type: 'slider',
+        start: 0,
+        end: 100,
+        height: 18,
+        bottom: 2,
+        borderColor: '#334155',
+        textStyle: { color: '#94a3b8', fontSize: 10 },
+        handleStyle: { color: '#f59e0b' }
+      }
+    ],
     legend: {
       data: ['Production Réelle Onduleur (W)', 'Prévision Solcast Calibrée (W)'],
       textStyle: { color: '#94a3b8' },
       top: 0,
+      left: 'center'
     },
     grid: {
       left: '3%',
       right: '3%',
-      bottom: '5%',
-      top: '15%',
+      bottom: '12%',
+      top: '16%',
       containLabel: true,
     },
     xAxis: {
@@ -160,16 +231,41 @@ export default function SolcastMLChart({ state, history = [] }) {
       textStyle: { color: '#f8fafc', fontSize: 12 },
       valueFormatter: (val) => val != null ? `${val} W` : '--',
     },
+    toolbox: {
+      show: true,
+      feature: {
+        dataZoom: { yAxisIndex: 'none', title: { zoom: 'Zoom zone', back: 'Zoom arrière' } },
+        restore: { title: 'Rétablir' },
+        saveAsImage: { title: 'Export PNG', name: `ems-conso-${timeRange}` }
+      },
+      iconStyle: { borderColor: '#94a3b8' },
+      top: 0,
+      right: '2%'
+    },
+    dataZoom: [
+      { type: 'inside', start: 0, end: 100 },
+      {
+        type: 'slider',
+        start: 0,
+        end: 100,
+        height: 18,
+        bottom: 2,
+        borderColor: '#334155',
+        textStyle: { color: '#94a3b8', fontSize: 10 },
+        handleStyle: { color: '#38bdf8' }
+      }
+    ],
     legend: {
       data: ['Consommation Réelle Foyer (W)', 'Prédiction ML Ridge/Tree (W)'],
       textStyle: { color: '#94a3b8' },
       top: 0,
+      left: 'center'
     },
     grid: {
       left: '3%',
       right: '3%',
-      bottom: '5%',
-      top: '15%',
+      bottom: '12%',
+      top: '16%',
       containLabel: true,
     },
     xAxis: {
@@ -331,45 +427,76 @@ export default function SolcastMLChart({ state, history = [] }) {
     <div className="space-y-6">
       {/* 1. Bloc Courbes Temps Réel : Prédiction vs Réel */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        {/* En-tête avec sélecteur de mode */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* En-tête avec sélecteur de mode et timeline Grafana */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-amber-400" />
               Courbes Comparatives : Prédiction vs Réel (Watts)
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Superposition continue de la prévision en temps réel face aux mesures réelles.
+              Superposition continue avec zoom interactif, panoramique et échelle temporelle paramétrable.
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-            <button
-              onClick={() => setActiveChart('solar')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-                activeChart === 'solar'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Sun className="w-3.5 h-3.5" />
-              Solaire Solcast vs Réel
-            </button>
-            <button
-              onClick={() => setActiveChart('load')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-                activeChart === 'load'
-                  ? 'bg-sky-500 text-slate-950 shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              Consommation ML vs Réel
-            </button>
+          {/* Boutons Sélecteurs */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Mode Solaire vs Conso */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+              <button
+                onClick={() => setActiveChart('solar')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+                  activeChart === 'solar'
+                    ? 'bg-amber-500 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                Solaire Solcast
+              </button>
+              <button
+                onClick={() => setActiveChart('load')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+                  activeChart === 'load'
+                    ? 'bg-sky-500 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Consommation ML
+              </button>
+            </div>
+
+            {/* Timeline Grafana : Plages Relatives & Absolues */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+              {[
+                { id: '1h', label: '1h' },
+                { id: '3h', label: '3h' },
+                { id: '6h', label: '6h' },
+                { id: '12h', label: '12h' },
+                { id: '24h', label: '24h' },
+                { id: '48h', label: '48h' },
+                { id: '7d', label: '7j' },
+                { id: 'today', label: 'Aujourd\'hui' },
+                { id: 'yesterday', label: 'Hier' },
+              ].map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => setTimeRange(item.id)}
+                  className={`px-2.5 py-1 rounded-lg font-mono font-medium transition-all ${
+                    timeRange === item.id
+                      ? 'bg-slate-700 text-amber-400 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Métriques de précision */}
+        {/* Métriques de précision et réentraînement */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/80">
           <div className="flex flex-wrap items-center gap-3">
             <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
@@ -381,6 +508,12 @@ export default function SolcastMLChart({ state, history = [] }) {
             <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
               Erreur MAE ML : <strong className="text-sky-400 font-mono">{mae} W</strong>
             </span>
+            {loadingHistory && (
+              <span className="text-xs text-amber-400 flex items-center gap-1.5 animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                Chargement timeline...
+              </span>
+            )}
           </div>
 
           <button
@@ -405,7 +538,7 @@ export default function SolcastMLChart({ state, history = [] }) {
         )}
 
         {/* Graphique ECharts */}
-        <div className="w-full h-[320px]">
+        <div className="w-full h-[340px]">
           <ReactECharts option={timeSeriesOption} style={{ height: '100%', width: '100%' }} />
         </div>
       </div>

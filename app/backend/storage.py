@@ -155,12 +155,17 @@ class EMSStorage:
         except Exception as err:
             _LOGGER.error("Failed to write decision log to SQLite: %s", err)
 
-    def get_recent_telemetry(self, hours: int = 24) -> list[dict[str, Any]]:
-        """Retrieve recent telemetry records for frontend charts."""
-        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+    def get_recent_telemetry(
+        self,
+        hours: int = 24,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retrieve recent telemetry records for frontend charts with relative or absolute time ranges."""
         try:
             with self._get_connection() as con:
-                cur = con.execute("""
+                params: list[Any] = []
+                query = """
                     SELECT 
                         timestamp,
                         pv_power_w,
@@ -178,9 +183,22 @@ class EMSStorage:
                         solcast_power_w,
                         predicted_load_w
                     FROM telemetry
-                    WHERE timestamp >= ?
-                    ORDER BY timestamp ASC
-                """, [cutoff])
+                    WHERE 1=1
+                """
+                if start_time:
+                    query += " AND timestamp >= ?"
+                    params.append(start_time)
+                else:
+                    cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+                    query += " AND timestamp >= ?"
+                    params.append(cutoff)
+
+                if end_time:
+                    query += " AND timestamp <= ?"
+                    params.append(end_time)
+
+                query += " ORDER BY timestamp ASC"
+                cur = con.execute(query, params)
                 return [dict(row) for row in cur.fetchall()]
         except Exception as err:
             _LOGGER.error("Failed to read telemetry from SQLite: %s", err)
