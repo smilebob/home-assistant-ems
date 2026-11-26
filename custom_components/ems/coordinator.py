@@ -100,11 +100,22 @@ class EMSDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return None
 
     async def async_initialize_ml(self) -> None:
-        """Load persisted ML models or perform initial training from 2-year Recorder history."""
+        """Load persisted ML models or initialize baseline prior models and schedule background training."""
         loaded_load = await self.hass.async_add_executor_job(self.ml_model.load_from_disk)
         loaded_solar = await self.hass.async_add_executor_job(self.solar_calibrator.load_from_disk)
+
+        # Ensure models have working baseline immediately without blocking HA setup
+        if not loaded_load or not self.ml_model.is_trained:
+            await self.hass.async_add_executor_job(self.ml_model.train, [], [])
+            await self.hass.async_add_executor_job(self.ml_model.save_to_disk)
+        if not loaded_solar or not self.solar_calibrator.is_trained:
+            await self.hass.async_add_executor_job(self.solar_calibrator.train, [], [], [])
+            await self.hass.async_add_executor_job(self.solar_calibrator.save_to_disk)
+
+        # If models were never trained on full Recorder history, launch background task
         if not loaded_load or not loaded_solar:
-            await self.async_retrain_ml_model()
+            _LOGGER.info("EMS ML models initialized with prior baseline; launching background Recorder historical training")
+            self.hass.async_create_task(self.async_retrain_ml_model())
 
     async def async_retrain_ml_model(self) -> dict[str, Any]:
         """Extract Recorder history and train both Consumption ML and Solar Calibration ML."""

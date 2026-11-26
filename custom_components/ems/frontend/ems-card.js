@@ -64,7 +64,18 @@ class SmartResidentialEMSCard extends HTMLElement {
   _render() {
     if (!this._hass || !this.shadowRoot) return;
 
-    const mainState = this._hass.states[this._config.entity];
+    const resolveState = (primary, fallbacks) => {
+      if (this._hass.states[primary]) return this._hass.states[primary];
+      for (const fb of fallbacks) {
+        if (this._hass.states[fb]) return this._hass.states[fb];
+      }
+      return null;
+    };
+
+    const mainState = resolveState(this._config.entity, [
+      "sensor.ems_active_priority_state",
+      "sensor.smart_residential_ems_ems_active_priority_state"
+    ]);
     const attrs = mainState ? mainState.attributes : {};
     const priorityState = mainState ? mainState.state : "idle";
 
@@ -110,6 +121,31 @@ class SmartResidentialEMSCard extends HTMLElement {
     // Thermostatic Valves
     const valves = Array.isArray(attrs.valve_recommendations) ? attrs.valve_recommendations : [];
     const valveSummary = attrs.valve_summary || "Aucun capteur de pièce annexe configuré";
+
+    const resolveEntityId = (primary, fallbacks) => {
+      if (this._hass.states[primary]) return primary;
+      for (const fb of fallbacks) {
+        if (this._hass.states[fb]) return fb;
+      }
+      return primary;
+    };
+
+    const autoSw = resolveEntityId(this._config.auto_switch, [
+      "switch.ems_autonomous_optimization",
+      "switch.smart_residential_ems_ems_autonomous_optimization",
+    ]);
+    const dhwSw = resolveEntityId(this._config.dhw_switch, [
+      "switch.ems_force_ecodan_dhw_boost_55_c",
+      "switch.smart_residential_ems_ems_force_ecodan_dhw_boost_55degc",
+    ]);
+    const teslaSw = resolveEntityId(this._config.tesla_switch, [
+      "switch.ems_force_tesla_max_charge",
+      "switch.smart_residential_ems_ems_force_tesla_max_charge",
+    ]);
+    const thermalSw = resolveEntityId(this._config.thermal_switch, [
+      "switch.ems_allow_zone_2_underfloor_thermal_storage",
+      "switch.smart_residential_ems_ems_allow_zone_2_underfloor_thermal_storage",
+    ]);
 
     const isSwitchOn = (ent) => this._hass.states[ent]?.state === "on";
 
@@ -373,16 +409,16 @@ class SmartResidentialEMSCard extends HTMLElement {
 
         <div class="section-title">Pilotage & Forçages Rapides</div>
         <div class="controls">
-          <button class="ctrl-btn ${isSwitchOn(this._config.auto_switch) ? "active" : ""}" id="btn-auto">
+          <button class="ctrl-btn ${isSwitchOn(autoSw) ? "active" : ""}" id="btn-auto">
             Pilote Auto EMS
           </button>
-          <button class="ctrl-btn ${isSwitchOn(this._config.dhw_switch) ? "active" : ""}" id="btn-dhw">
+          <button class="ctrl-btn ${isSwitchOn(dhwSw) ? "active" : ""}" id="btn-dhw">
             Forcer Boost ECS (55°C)
           </button>
-          <button class="ctrl-btn ${isSwitchOn(this._config.tesla_switch) ? "active" : ""}" id="btn-tesla">
+          <button class="ctrl-btn ${isSwitchOn(teslaSw) ? "active" : ""}" id="btn-tesla">
             Forcer Charge Max Tesla
           </button>
-          <button class="ctrl-btn ${isSwitchOn(this._config.thermal_switch) ? "active" : ""}" id="btn-thermal">
+          <button class="ctrl-btn ${isSwitchOn(thermalSw) ? "active" : ""}" id="btn-thermal">
             Stockage Inertie Salon
           </button>
           <button class="ctrl-btn" id="btn-ml">
@@ -392,10 +428,11 @@ class SmartResidentialEMSCard extends HTMLElement {
       </ha-card>
     `;
 
-    this.shadowRoot.getElementById("btn-auto")?.addEventListener("click", () => this._toggleEntity(this._config.auto_switch));
-    this.shadowRoot.getElementById("btn-dhw")?.addEventListener("click", () => this._toggleEntity(this._config.dhw_switch));
-    this.shadowRoot.getElementById("btn-tesla")?.addEventListener("click", () => this._toggleEntity(this._config.tesla_switch));
-    this.shadowRoot.getElementById("btn-thermal")?.addEventListener("click", () => this._toggleEntity(this._config.thermal_switch));
+    this.shadowRoot.getElementById("btn-auto")?.addEventListener("click", () => this._toggleEntity(autoSw));
+    this.shadowRoot.getElementById("btn-dhw")?.addEventListener("click", () => this._toggleEntity(dhwSw));
+    this.shadowRoot.getElementById("btn-tesla")?.addEventListener("click", () => this._toggleEntity(teslaSw));
+    this.shadowRoot.getElementById("btn-thermal")?.addEventListener("click", () => this._toggleEntity(thermalSw));
+    this.shadowRoot.getElementById("btn-ml")?.addEventListener("click", () => this._retrainML());
     this.shadowRoot.getElementById("btn-ml")?.addEventListener("click", () => this._retrainML());
   }
 

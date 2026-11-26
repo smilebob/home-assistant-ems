@@ -22,10 +22,11 @@ if os.environ.get("EMS_DISABLE_NUMPY") != "1":
     try:
         import numpy as np
         from sklearn.ensemble import RandomForestRegressor
-
+        # Test basic tensor creation to verify CPU instruction set support (avoids X86_V2 runtime crash)
+        _ = np.zeros(1)
         HAS_SKLEARN = True
-    except (ImportError, RuntimeError, Exception) as err:
-        _LOGGER.info("Scikit-learn/NumPy binary acceleration unavailable (%s), using pure Python ensemble fallback", err)
+    except BaseException as err:
+        _LOGGER.info("Scikit-learn/NumPy binary acceleration unavailable or unsupported CPU (%s), using pure Python ensemble fallback", err)
         HAS_SKLEARN = False
 
 
